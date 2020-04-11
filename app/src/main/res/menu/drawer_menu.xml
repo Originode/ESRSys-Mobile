@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    >
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/first"
+            android:icon="@drawable/ic_menu_manage"
+            android:title="Tools" />
+
+        <item
+            android:id="@+id/second"
+            android:icon="@drawable/ic_event_note_black_24dp"
+            android:title="Reports" />
+
+        <item
+            android:id="@+id/menu_sync"
+            android:icon="@drawable/ic_save_black_24dp"
+            android:title="Sync" />
+        <item
+            android:id="@+id/menu_login_logout"
+            android:icon="@drawable/ic_save_black_24dp"
+            android:title="Login" />
+    </group>
+
+</menu>

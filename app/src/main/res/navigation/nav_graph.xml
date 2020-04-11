@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/homeFragment">
+
+    <fragment
+        android:id="@+id/toolsFragment"
+        android:name="ph.esrconstruction.esrsys.esrsysmobile.ToolsFragment"
+        android:label="Tools"
+        tools:layout="@layout/tools_fragment" >
+        <action
+            android:id="@+id/action_toolsFragment_to_employeesFragment"
+            app:destination="@id/employeesFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/secondFragment"
+        android:name="ph.esrconstruction.esrsys.esrsysmobile.ReportsFragment"
+        android:label="Reports"
+        tools:layout="@layout/reports_fragment" />
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="ph.esrconstruction.esrsys.esrsysmobile.ui.login.LoginFragment"
+        android:label="Login"
+        tools:layout="@layout/login_fragment" >
+        <action
+            android:id="@+id/action_loginFragment_to_homeFragment"
+            app:destination="@id/homeFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="ph.esrconstruction.esrsys.esrsysmobile.HomeFragment"
+        android:label="Dashboard"
+        tools:layout="@layout/home_fragment" >
+        <action
+            android:id="@+id/action_homeFragment_to_loginFragment"
+            app:destination="@id/loginFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/employeesFragment"
+        android:name="ph.esrconstruction.esrsys.esrsysmobile.EmployeesFragment"
+        android:label="Employees"
+        tools:layout="@layout/fragment_employeesitem_list" >
+        <action
+            android:id="@+id/action_employeesFragment_to_employeeFragment"
+            app:destination="@id/employeeFragment"
+            app:enterAnim="@anim/nav_default_enter_anim"
+            app:exitAnim="@anim/nav_default_exit_anim"
+            app:popEnterAnim="@anim/nav_default_pop_enter_anim"
+            app:popExitAnim="@anim/nav_default_pop_exit_anim"
+            app:popUpTo="@+id/employeeFragment" >
+            <argument
+                android:name="employeeID"
+                app:argType="Long"
+                />
+        </action>
+    </fragment>
+    <fragment
+        android:id="@+id/employeeFragment"
+        android:name="ph.esrconstruction.esrsys.esrsysmobile.ui.EmployeeFragment"
+        android:label="Employee"
+        tools:layout="@layout/fragment_employee" >
+    </fragment>
+</navigation>
