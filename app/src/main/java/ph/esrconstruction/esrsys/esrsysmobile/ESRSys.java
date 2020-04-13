@@ -1,20 +1,30 @@
 package ph.esrconstruction.esrsys.esrsysmobile;
 
+import android.Manifest;
 import android.app.Application;
 import io.realm.Realm;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.SystemClock;
+import android.telephony.SubscriptionInfo;
+import android.telephony.SubscriptionManager;
+import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 
 import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LifecycleRegistry;
 
 import io.realm.RealmConfiguration;
+import io.realm.RealmResults;
 import ph.esrconstruction.esrsys.esrsysmobile.data.LoginDataSource;
 import ph.esrconstruction.esrsys.esrsysmobile.data.LoginRepository;
+import ph.esrconstruction.esrsys.esrsysmobile.data.model.DeviceSettings;
 import ph.esrconstruction.esrsys.esrsysmobile.network.ConnectionLiveData;
 import ph.esrconstruction.esrsys.esrsysmobile.network.ESRServer;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.modules.ESRModules;
@@ -30,6 +40,8 @@ import com.orhanobut.logger.FormatStrategy;
 import com.orhanobut.logger.Logger;
 import com.orhanobut.logger.PrettyFormatStrategy;
 
+import java.util.List;
+
 
 public class ESRSys extends Application implements LifecycleOwner {
 
@@ -44,18 +56,6 @@ public class ESRSys extends Application implements LifecycleOwner {
     public static Boolean devMode = false;
 
 
-
-    private Realm realm;
-    public Realm getRealm() {
-        if(realm == null){
-            realm = Realm.getInstance(getEsrConfig());
-        }
-        return realm;
-    }
-
-    public void setRealm(Realm realm) {
-        this.realm = realm;
-    }
 
     private static RealmConfiguration esrConfig;
 
@@ -91,6 +91,8 @@ public class ESRSys extends Application implements LifecycleOwner {
     public static final int MobileData = 2;
     public static final int WifiData = 1;
 
+    private static DeviceSettings deviceSettings;
+
 
     private LifecycleRegistry lifecycleRegistry = new LifecycleRegistry(this);
     public ConnectionLiveData connectionLiveData;
@@ -100,7 +102,7 @@ public class ESRSys extends Application implements LifecycleOwner {
 
             Realm.init(getInstance());
             setEsrConfig(new RealmConfiguration.Builder()
-                    .name("esrdb-v005.realm")
+                    .name("esrdb-v010.realm")
                     .modules(Realm.getDefaultModule(), new ESRModules())
                     .deleteRealmIfMigrationNeeded()
                     .build());
@@ -113,6 +115,9 @@ public class ESRSys extends Application implements LifecycleOwner {
         ESRSys.esrConfig = esrConfig;
     }
 
+
+
+
     public void startEmployeeSyncService(String updateMethod){
 
         // use this to start and trigger a service
@@ -120,6 +125,31 @@ public class ESRSys extends Application implements LifecycleOwner {
 // potentially add data to the intent
         iEmployee.putExtra("updateMethod", updateMethod);
         this.startService(iEmployee);
+    }
+
+    private String getPhone() {
+        if (ActivityCompat.checkSelfPermission(getApplicationContext(), Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            return "";
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+
+            List<SubscriptionInfo> subscription = SubscriptionManager.from(getApplicationContext()).getActiveSubscriptionInfoList();
+            if(subscription != null && subscription.size()>0){
+                for (int i = 0; i < subscription.size(); i++) {
+                    SubscriptionInfo info = subscription.get(i);
+                    Logger.t(TAG).i( "number " + info.getNumber());
+                    Logger.t(TAG).i( "network name : " + info.getCarrierName());
+                    Logger.t(TAG).i( "country iso " + info.getCountryIso());
+                }
+                return subscription.get(0).getNumber();
+            }else{
+                TelephonyManager phoneMgr = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+                return phoneMgr.getLine1Number();
+            }
+        }else{
+            TelephonyManager phoneMgr = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
+            return phoneMgr.getLine1Number();
+        }
     }
 
     @Override
@@ -137,19 +167,17 @@ public class ESRSys extends Application implements LifecycleOwner {
         // initialize the singleton
         sInstance = this;
 
+        Logger.t(TAG).i("phone number = " + getPhone());
+
+
         currentLogin = new LoginRepository(new LoginDataSource());
-
-
-
-        startEmployeeSyncService("first time");
-
 
 
 
         /* Live data object and setting an oberser on it */
         connectionLiveData = new ConnectionLiveData(getApplicationContext());
         connectionLiveData.observeForever(connection -> {
-            Logger.t(TAG).d("Network statex");
+            //Logger.t(TAG).d("Network statex");
             devServer.ping();
             localServer.ping();
             remoteServer.ping();
@@ -161,14 +189,18 @@ public class ESRSys extends Application implements LifecycleOwner {
         });
         localServer.getServerConnected().observe(this, serverConnected -> {
             Logger.d("server " + (serverConnected ? "online" : "offline"));
+
         });
         remoteServer.getServerConnected().observe(this, serverConnected -> {
             Logger.d("server " + (serverConnected ? "online" : "offline"));
+
         });
 
 
 
         periodicPingHandler.post(periodicPingUpdate);
+
+        startEmployeeSyncService("first time");
 
 
     }

@@ -32,7 +32,7 @@ class Ping extends AsyncTask<Void,Void,Boolean> {
         mServer.cnt = (int) (probeFinish - dnsResolved);
         mServer.host = mServer.url.getHost();
         mServer.ip = hostAddress;
-        Logger.d("ping ! " + mServer.host + " ! " + mServer.net);
+        //Logger.d("ping ! " + mServer.host + " ! " + mServer.net);
         return mServer.net != "NO_CONNECTION";
     } catch (IOException e) { return false; } }
 

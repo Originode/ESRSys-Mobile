@@ -1,20 +1,10 @@
 package ph.esrconstruction.esrsys.esrsysmobile.data
 
-import android.annotation.SuppressLint
-import android.util.Base64
-import androidx.annotation.NonNull
 import com.orhanobut.logger.Logger
 import io.realm.Realm
-import io.realm.RealmConfiguration
-import org.json.JSONException
-import org.json.JSONObject
 import ph.esrconstruction.esrsys.esrsysmobile.ESRSys
+import ph.esrconstruction.esrsys.esrsysmobile.data.model.DeviceSettings
 import ph.esrconstruction.esrsys.esrsysmobile.data.model.LoggedInUser
-import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee
-import java.io.IOException
-import java.text.ParseException
-import java.text.SimpleDateFormat
-import kotlin.math.log
 
 /**
  * Class that requests authentication and user information from the remote data source and
@@ -23,20 +13,12 @@ import kotlin.math.log
 
 class LoginRepository(val dataSource: LoginDataSource) {
 
-    var realm : Realm = Realm.getInstance(ESRSys.getEsrConfig())
-        private set
 
     // in-memory cache of the loggedInUser object
     var user: LoggedInUser? = null
         private set
 
-
-    fun ruser(): LoggedInUser? {
-            return dataSource.ruser(user?.userId)
-    }
-
-
-
+    var realm: Realm = Realm.getInstance(ESRSys.getEsrConfig())
 
     val isLoggedIn: Boolean
         get() = user != null
@@ -45,20 +27,154 @@ class LoginRepository(val dataSource: LoginDataSource) {
         // If user credentials will be cached in local storage, it is recommended it be encrypted
         // @see https://developer.android.com/training/articles/keystore
         user = null
+
+        //find cached stuff
+        Logger.i("fooock")
+
+        //get stored device settings
+        var deviceSettings:DeviceSettings
+        val rr = arrayOf("")
+        realm = Realm.getInstance(ESRSys.getEsrConfig())
+        realm.executeTransaction { inRealm ->
+            if (inRealm.where(DeviceSettings::class.java).count() > 0) {
+                Logger.i("loading device settings")
+                deviceSettings = inRealm.where(DeviceSettings::class.java).findFirst()!!
+            } else {
+                Logger.i("creating new device settings...")
+                deviceSettings = inRealm.createObject(DeviceSettings::class.java, "Unknwon-000")
+            }
+            rr[0] = deviceSettings.cachedUser
+            Logger.i(rr[0])
+            if(rr[0] != ""){
+
+                var r = inRealm.where<LoggedInUser>(LoggedInUser::class.java).equalTo("userId", rr[0])
+                Logger.i(r.count().toString())
+                if(r.count()>0){
+                    user = r.findFirst()
+                    Logger.d("cached user: " + (user?.userId ?: ""))
+                    Logger.d("cached token: " + (user?.token ?: ""))
+
+                    var username = (user?.userId ?: "")
+                    var token = (user?.token ?: "")
+                    Logger.d("xxxx" + ESRSys.getServer().serverConnected!!.value!!)
+
+                    if (username != "" && token != "" && ESRSys.getServer().serverConnected!!.value!!) {
+                        Logger.d("server online... executing auto login...")
+
+                        //todo: zzzzzzz
+                    }
+
+                }
+
+            }
+        }
+        // realm.close()
+
+
     }
+
+    fun asyncAutoLogin(myCallback: (result: Result<LoggedInUser>) -> Unit) {
+        // handle login
+
+
+        //get stored device settings
+        var deviceSettings:DeviceSettings
+        val rr = arrayOf("")
+        val realm = Realm.getInstance(ESRSys.getEsrConfig())
+        realm.executeTransaction { inRealm ->
+            if (inRealm.where(DeviceSettings::class.java).count() > 0) {
+                Logger.i("loading device settings")
+                deviceSettings = inRealm.where(DeviceSettings::class.java).findFirst()!!
+            } else {
+                Logger.i("creating new device settings...")
+                deviceSettings = inRealm.createObject(DeviceSettings::class.java, "Unknwon-000")
+            }
+            rr[0] = deviceSettings.cachedUser
+            Logger.i(rr[0])
+            if(rr[0] != ""){
+
+                var r = inRealm.where<LoggedInUser>(LoggedInUser::class.java).equalTo("userId", rr[0])
+                Logger.i(r.count().toString())
+                if(r.count()>0){
+                    user = r.findFirst()
+                    Logger.d("cached user: " + (user?.userId ?: ""))
+                    Logger.d("cached token: " + (user?.token ?: ""))
+
+                    var username = (user?.userId ?: "")
+                    var token = (user?.token ?: "")
+                    Logger.d("xxxx" + ESRSys.getServer().serverConnected!!.value!!)
+
+                    if (username != "" && token != "" && ESRSys.getServer().serverConnected!!.value!!) {
+                        Logger.d("server online... executing auto login...")
+
+                        ////////////////*
+
+                        //val value = String.format("Basic %s", encodedString)
+                        dataSource.asyncLogin(username, "token:"+token, myCallback = {
+
+                            if (it is Result.Success) {
+
+                                setLoggedInUser(it.data)
+                                Logger.d("autologin success: " + it.data.displayName)
+                                //save cached username
+
+                                val realm = Realm.getInstance(ESRSys.getEsrConfig())
+                                realm.executeTransaction { inRealm ->
+                                    var deviceSettings = DeviceSettings()
+                                    if(inRealm.where(DeviceSettings::class.java).count() > 0){
+                                        deviceSettings = inRealm.where(DeviceSettings::class.java).findFirst()!!
+                                    }
+                                    deviceSettings.cachedUser = it.data.userId
+                                }
+                                realm.close()
+                            }else{
+                                Logger.d(it.toString())
+                            }
+                            myCallback.invoke(it)
+                        })
+                    }
+
+                }
+
+            }
+        }
+        // realm.close()
+
+    }
+
 
     fun asyncLogout(myCallback: (result: Boolean) -> Boolean) {
         Logger.d("initiate logout")
+
         dataSource.asyncLogout(myCallback = {
             Logger.d("finish logout")
-            if(it) user = null
+            if(it) {
+                //remove cached user
+                try {
+                    realm.executeTransaction { inRealm ->
+                        user?.deleteFromRealm()
+
+                        user = null
+                            var deviceSettings = DeviceSettings()
+                            if(inRealm.where(DeviceSettings::class.java).count() > 0){
+                                deviceSettings = inRealm.where(DeviceSettings::class.java).findFirst()!!
+                            }
+                            deviceSettings.cachedUser = ""
+                    }
+                }catch (e: Throwable) {
+                }finally {
+                    realm.close()
+                }
+                //user = null
+            }
             myCallback(it)
         })
+
 
     }
     fun asyncLogin(username: String, password: String, myCallback: (result: Result<LoggedInUser>) -> Unit) {
         // handle login
-
+        realm = Realm.getInstance(ESRSys.getEsrConfig())
 
         //val value = String.format("Basic %s", encodedString)
         dataSource.asyncLogin(username, password, myCallback = {
@@ -66,6 +182,15 @@ class LoginRepository(val dataSource: LoginDataSource) {
             if (it is Result.Success) {
 
                 setLoggedInUser(it.data)
+
+                //save cached username
+                realm.executeTransaction { inRealm ->
+                    var deviceSettings = DeviceSettings()
+                    if(inRealm.where(DeviceSettings::class.java).count() > 0){
+                        deviceSettings = inRealm.where(DeviceSettings::class.java).findFirst()!!
+                    }
+                    deviceSettings.cachedUser = it.data.userId
+                }
             }
             myCallback.invoke(it)
         })

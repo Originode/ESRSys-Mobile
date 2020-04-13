@@ -29,7 +29,6 @@ import com.android.volley.VolleyError
  * Class that handles authentication w/ login credentials and retrieves user information.
  */
 class LoginDataSource {
-    internal var realm: Realm = ESRSys.getInstance().realm
 
     fun asyncLogin(username: String, password: String, myCallback: (result: Result<LoggedInUser>) -> Unit) {
         // perform some network work
@@ -56,22 +55,22 @@ class LoginDataSource {
                                 var xusername:String = d?.optString("UserName") ?: ""
                                 var xemail:String = d?.optString("Email") ?: ""
                                 var xtoken:String = d?.optString("Token") ?: ""
-                                Logger.d(xtoken)
+                                Logger.d(xusername + "," + xemail + "," + xtoken)
 
 
                                 var realUser:LoggedInUser = LoggedInUser()
-                                realm = Realm.getInstance(ESRSys.getEsrConfig())
+                                var realm:Realm = Realm.getInstance(ESRSys.getEsrConfig())
                                 try {
                                     realm.executeTransaction {
                                         // Add a person
                                         var temp = realm.where<LoggedInUser>(LoggedInUser::class.java).equalTo("userId", username)
 
                                         realUser = if (temp.count() > 0) temp.findFirst()!! else realm.createObject(LoggedInUser::class.java, username)
-                                        if (realUser != null) {
+
                                             realUser.displayName = xusername
                                             realUser.token = xtoken
                                             realUser.encodedCredentials = encodedCredentials
-                                        }
+
 
                                     }
 
@@ -82,7 +81,7 @@ class LoginDataSource {
                                     realm.close()
                                 }
 
-                                myCallback.invoke(Result.Success(realUser as LoggedInUser))
+                                myCallback.invoke(Result.Success(realUser))
 
 
                             } else {
@@ -129,7 +128,7 @@ class LoginDataSource {
             } catch (e: Throwable) {
                 myCallback.invoke(Result.Error(IOException("Error logging in", e)))
             } finally {
-                realm.close()
+                //
             }
 
         }
@@ -139,7 +138,7 @@ class LoginDataSource {
 
     fun ruser(userId : String?): LoggedInUser? {
         var loggedInUser: LoggedInUser? = if (userId != null) {
-            realm = Realm.getInstance(ESRSys.getEsrConfig())
+            var realm:Realm = Realm.getInstance(ESRSys.getEsrConfig())
 
             var lll: LoggedInUser? = null
             realm.executeTransaction { inRealm ->
@@ -164,11 +163,11 @@ class LoginDataSource {
 
 
             var username = user!!.userId
-            var password = "token:" + user!!.token
+            var password = "token:" + user.token
 
             val encodedCredentials = String.format("Basic %s", Base64.encodeToString(String.format("%s:%s", username, password).toByteArray(), Base64.NO_WRAP))
 
-            realm = Realm.getInstance(ESRSys.getEsrConfig())
+
             val queue = Volley.newRequestQueue(ESRSys.getInstance())
             try {
                 // TODO: handle loggedInUser authentication
@@ -177,11 +176,10 @@ class LoginDataSource {
 
 
                 val stringRequest = object : StringRequest(Request.Method.POST, url_api_get,
-                        Response.Listener {
-                            response ->
+                        Response.Listener(function = fun(response: String) {
                             Logger.d(response)
                             myCallback.invoke(true)
-                        },
+                        }),
                         Response.ErrorListener {
                             error ->
                             Logger.d("is it me?")
@@ -219,7 +217,7 @@ class LoginDataSource {
             } catch (e: Throwable) {
                 myCallback.invoke(false)
             } finally {
-                realm.close()
+               // realm.close()
             }
 
 

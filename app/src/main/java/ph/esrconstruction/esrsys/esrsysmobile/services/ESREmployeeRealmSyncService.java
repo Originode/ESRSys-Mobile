@@ -54,7 +54,6 @@ public class ESREmployeeRealmSyncService extends Service {
    
     int imageLoaderCount = 0;
 
-    private Realm realm;
 
 
     // Binder given to clients
@@ -78,17 +77,17 @@ public class ESREmployeeRealmSyncService extends Service {
 
     public void employeeUpdate(){
 
-        Logger.i("Number of Employees in Local DB : " + realm.where(Employee.class).count());
 
 
         //get login credentials
-        realm = Realm.getInstance(ESRSys.getEsrConfig());
+        Realm realme = Realm.getInstance(ESRSys.getEsrConfig());
+
         final String[] _encodedCredentials = {""};
 
-        realm.executeTransaction(new Realm.Transaction() {
+        realme.executeTransaction(new Realm.Transaction() {
             @Override
             public void execute(@NonNull Realm inRealm) {
-
+                Logger.i("Number of Employees in Local DB : " + inRealm.where(Employee.class).count());
                 // inRealm.where<LoggedInUser>(LoggedInUser::class.java).equalTo("userId", userId).findFirst()
 
                 LoggedInUser u = ESRSys.getInstance().currentLogin.getUser();
@@ -103,7 +102,7 @@ public class ESREmployeeRealmSyncService extends Service {
 
             }
         });
-        realm.close();
+        realme.close();
 
         Logger.i("Server Connected : " + ESRSys.getServer().getServerConnected().getValue());
         Logger.i("Logged in : " + ESRSys.getInstance().currentLogin.isLoggedIn());
@@ -142,9 +141,9 @@ public class ESREmployeeRealmSyncService extends Service {
 
                         // Delete old data from local database....
                         if (!jsonArray.isNull(0)) {
-                            realm = Realm.getInstance(ESRSys.getEsrConfig());
+                            Realm realmz = Realm.getInstance(ESRSys.getEsrConfig());
                             // Delete old data from local database....
-                            realm.executeTransaction(new Realm.Transaction() {
+                            realmz.executeTransaction(new Realm.Transaction() {
                                 @Override
                                 public void execute(@NonNull Realm inRealm) {
 
@@ -153,12 +152,12 @@ public class ESREmployeeRealmSyncService extends Service {
                                     r.deleteAllFromRealm();
                                 }
                             });
-                            realm.close();
+                            realmz.close();
 
 
-                            realm = Realm.getInstance(ESRSys.getEsrConfig());
+                            realmz = Realm.getInstance(ESRSys.getEsrConfig());
                             //add new data to local database
-                            realm.executeTransaction(new Realm.Transaction() {
+                            realmz.executeTransaction(new Realm.Transaction() {
                                 @Override
                                 public void execute(Realm inRealm) {
                                     int addedCount = 0;
@@ -239,7 +238,7 @@ public class ESREmployeeRealmSyncService extends Service {
                                     Logger.i(updatedCount + " updated employees");
                                 }
                             });
-                            realm.close();
+                            realmz.close();
 
                         }
 
@@ -288,7 +287,6 @@ public class ESREmployeeRealmSyncService extends Service {
                    // String encodedString = Base64.encodeToString(String.format("%s:%s", "mnrevelo", "mX111401!!").getBytes(), Base64.NO_WRAP);
                     //String value = String.format("Basic %s", encodedString);
 
-                    realm = Realm.getInstance(ESRSys.getEsrConfig());
 
                     Logger.i("Server Connected : " + ESRSys.getServer().getServerConnected().getValue());
                     Logger.i("Logged in : " + ESRSys.getInstance().currentLogin.isLoggedIn());
@@ -358,7 +356,7 @@ public class ESREmployeeRealmSyncService extends Service {
 
 
 
-                    realm = Realm.getInstance(ESRSys.getEsrConfig());
+                    Realm realm = Realm.getInstance(ESRSys.getEsrConfig());
                     realm.executeTransactionAsync(inRealm -> {
 
                         long ddd = inRealm.where(Employee.class).count();
@@ -389,14 +387,20 @@ public class ESREmployeeRealmSyncService extends Service {
                             employees.setValue("ImageLoaded", -1);
                             lazyloadImages(posts);
                         }
-                    }, () -> realm.close(), error -> realm.close());
+
+                    }, () -> {
+
+                        realm.close();
+                    }, error -> {
+                        realm.close();
+                    });
 
 
 
 
                 }
             }else{
-                Logger.i("No network");
+                Logger.i("waiting for network");
             }
         }
     };
@@ -425,20 +429,23 @@ public class ESREmployeeRealmSyncService extends Service {
                             bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream);
                             final byte[] byteArray = stream.toByteArray();
 
-                            realm = Realm.getInstance(ESRSys.getEsrConfig());
+                            Realm realm = Realm.getInstance(ESRSys.getEsrConfig());
+
                             realm.executeTransactionAsync(inRealm -> {
 
                                 Employee employeex = inRealm.where(Employee.class).equalTo("EmployeeID",idx).findFirst();
                                 employeex.setImage(byteArray);
                                 employeex.setImageLoaded(1);
                             }, () -> {
+
                                 realm.close();
                                 //Logger.d("Image Loaded");
                                 imageLoaderCount--;
                             }, error -> {
+
                                 realm.close();
                                 imageLoaderCount--;
-                                Toast.makeText(getApplicationContext(), error.getMessage(), Toast.LENGTH_LONG).show();
+                                Logger.d(error.getMessage());
                             });
 
 
@@ -448,7 +455,7 @@ public class ESREmployeeRealmSyncService extends Service {
                         public void onErrorResponse(VolleyError volleyError) {
 
 
-                            realm = Realm.getInstance(ESRSys.getEsrConfig());
+                            Realm realm = Realm.getInstance(ESRSys.getEsrConfig());
                             realm.executeTransactionAsync(inRealm -> {
                                 Employee employeex = inRealm.where(Employee.class).equalTo("EmployeeID",idx).findFirst();
                                 employeex.setImageLoaded(0);
@@ -478,25 +485,35 @@ public class ESREmployeeRealmSyncService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Bundle bundle = intent.getExtras();
         String updateMethod = "";
-        if (bundle.getString("updateMethod") != null) {
-            updateMethod = bundle.getString("updateMethod");
+        if(intent != null){
+            Bundle bundle = intent.getExtras();
+
+            if (bundle.getString("updateMethod") != null) {
+                updateMethod = bundle.getString("updateMethod");
+            }
+        }else{
         }
+
 
         Logger.t(TAG).v("Employee Sync Started...update method = " + updateMethod);
 
 
+        final int[] employeeCount = {0};
+        Realm realm = Realm.getInstance(ESRSys.getEsrConfig());
 
-        realm = Realm.getInstance(ESRSys.getEsrConfig());
-        int employeeCount = realm.where(Employee.class).findAll().size();
+        realm.executeTransaction(inRealm -> {
+            employeeCount[0] = inRealm.where(Employee.class).findAll().size();
 
+        });
+        realm.close();
 
+        /*
         if(updateMethod == "quicky"){
             Logger.i("running quick update");
             employeeUpdate();
-        }else if(employeeCount == 0){
-            Logger.i("empty employee records...running quick update in 5 seconds");
+        }else if(employeeCount[0] == 0){
+            Logger.i("empty employee records...running quick update in 3 seconds");
             periodicEmployeeHandler.postDelayed(
 
                     new Runnable() {
@@ -505,18 +522,15 @@ public class ESREmployeeRealmSyncService extends Service {
                             employeeUpdate(); //update now
                         }
                     }
-                    , 5 * 1000 - SystemClock.elapsedRealtime() % 1000);
-
-
+                    , 3 * 1000 - SystemClock.elapsedRealtime() % 1000);
 
         }else{
             // currentPeriodicEmployeeUpdateDelay
-            Logger.i("running periodic update");
-            periodicEmployeeHandler.post(periodicEmployeeUpdate);
-            periodicTestHandler.post(periodicTestUpdate);
+            //Logger.i("running periodic update");
         }
-
-
+*/
+        periodicEmployeeHandler.post(periodicEmployeeUpdate);
+        periodicTestHandler.post(periodicTestUpdate);
         /////
 
        // getAllData();

@@ -32,7 +32,7 @@ import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.HomeViewModel;
 
 public class HomeFragment extends Fragment {
-    private Realm realm = ESRSys.getInstance().getRealm();
+    private Realm realm = Realm.getInstance(ESRSys.getEsrConfig());
     private RealmChangeListener realmListener;
     private RealmResults<Employee> employees;
 
@@ -144,7 +144,11 @@ public class HomeFragment extends Fragment {
 
 
 
+        realm = Realm.getInstance(ESRSys.getEsrConfig());
+        realm.executeTransaction(inRealm -> {
+                Logger.d(".");
 
+        });
         realmListener = new RealmChangeListener<Realm>() {
             @Override
             public void onChange(Realm realm) {
@@ -152,7 +156,7 @@ public class HomeFragment extends Fragment {
             }
         };
         realm.addChangeListener(realmListener);
-
+        //realm.close();
 
 
 

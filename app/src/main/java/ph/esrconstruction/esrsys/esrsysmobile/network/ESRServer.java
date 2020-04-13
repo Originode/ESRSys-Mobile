@@ -55,7 +55,7 @@ public class ESRServer {
         return this.protocol + "://" + this.ip + ":" + this.port + "/";
     }
     public ESRServer ping(){
-            Logger.d("pinging " + this.name + " : " +  url.getHost() + " : "+ this.getURL() + " : "+ this.url.getPort());
+            //Logger.d("pinging " + this.name + " : " +  url.getHost() + " : "+ this.getURL() + " : "+ this.url.getPort());
 
             new Ping(this).execute();
         return this;
