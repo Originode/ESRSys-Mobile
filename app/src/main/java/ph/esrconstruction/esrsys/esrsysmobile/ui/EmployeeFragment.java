@@ -20,8 +20,13 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.orhanobut.logger.Logger;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -32,6 +37,7 @@ import ph.esrconstruction.esrsys.esrsysmobile.ESRSys;
 import ph.esrconstruction.esrsys.esrsysmobile.EmployeesFragmentDirections;
 import ph.esrconstruction.esrsys.esrsysmobile.MainActivity;
 import ph.esrconstruction.esrsys.esrsysmobile.R;
+import ph.esrconstruction.esrsys.esrsysmobile.events.NFCReadEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.network.ConnectionModel;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.modules.ESRModules;
@@ -139,8 +145,11 @@ public class EmployeeFragment extends Fragment {
         TextView updatedTextView = getView().findViewById(R.id.updatedTextView);
         updatedTextView.setText(dateFormat.format(mViewModel.getEmployee().getValue().getLastUpdate()));
 
-        TextView nameTextView = getView().findViewById(R.id.nameTextView);
-        nameTextView.setText(mViewModel.getEmployee().getValue().getName());
+        //TextView nameTextView = getView().findViewById(R.id.nameTextView);
+       // nameTextView.setText(mViewModel.getEmployee().getValue().getName());
+
+        TextView nameTextEdit = getView().findViewById(R.id.nameTextEdit);
+        nameTextEdit.setText(mViewModel.getEmployee().getValue().getName());
 
         TextView ProjectNameTextView = getView().findViewById(R.id.projectNameTextView);
         ProjectNameTextView.setText(mViewModel.getEmployee().getValue().getProjectName());
@@ -173,6 +182,14 @@ public class EmployeeFragment extends Fragment {
         });
         //updateCounts();
 
+        EventBus.getDefault().register(this);
+
+    }
+
+    @Override
+    public void onStop() {
+        EventBus.getDefault().unregister(this);
+        super.onStop();
     }
 
 
@@ -270,6 +287,16 @@ public class EmployeeFragment extends Fragment {
         ((MainActivity)getActivity()).mNfcReadFragment.show(getFragmentManager(),NFCReadFragment.TAG);
 
     }
+
+
+    // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onNFCReadEvent(NFCReadEvent event) {
+        Toast.makeText(getActivity(), event.message, Toast.LENGTH_SHORT).show();
+        Logger.t("NFC").d(event.message);
+    }
+
+
 
 
 }

@@ -63,12 +63,15 @@
                 android:background="#CDE4F0"
                 android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/nameTextView"
+                <EditText
+                    android:id="@+id/nameTextEdit"
                     android:layout_width="match_parent"
-                    android:layout_height="37dp"
+                    android:layout_height="wrap_content"
+                    android:editable="false"
+                    android:ems="10"
+                    android:inputType="textPersonName"
                     android:text="Name"
-                    android:textSize="25sp" />
+                    android:textSize="24sp" />
 
                 <TextView
                     android:id="@+id/projectNameTextView"

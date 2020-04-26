@@ -25,6 +25,7 @@ android {
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
     }
+
 }
 
 dependencies {
@@ -42,6 +43,7 @@ dependencies {
     implementation 'androidx.annotation:annotation:1.0.0'
     implementation 'androidx.lifecycle:lifecycle-extensions:2.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.0.0'
+    implementation 'org.greenrobot:eventbus:3.2.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.1.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.0'
@@ -66,4 +68,15 @@ dependencies {
 
     // implementation 'com.github.thorbenprimke:realm-recyclerview:0.9.25'
     implementation 'io.realm:android-adapters:2.1.1'
+
+    implementation 'org.nfctools:nfctools-core:1.0.M8'
+    implementation 'org.nfctools:nfctools-ndef:1.0.M8'
+
+    implementation 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
+
+    implementation 'org.slf4j:slf4j-nop:1.7.25'
+    implementation files('libs\\libBioMini_v20.aar')
+
+    implementation 'joda-time:joda-time:2.10.6'
+
 }
