@@ -36,6 +36,14 @@
         <action
             android:id="@+id/action_homeFragment_to_loginFragment"
             app:destination="@id/loginFragment" />
+        <action
+            android:id="@+id/action_homeFragment_to_employeeFragment"
+            app:destination="@id/employeeFragment" >
+            <argument
+                android:name="employeeID"
+                app:argType="Long"
+                />
+        </action>
     </fragment>
     <fragment
         android:id="@+id/employeesFragment"

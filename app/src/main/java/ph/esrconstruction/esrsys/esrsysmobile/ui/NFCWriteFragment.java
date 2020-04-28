@@ -15,11 +15,14 @@ import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import org.greenrobot.eventbus.EventBus;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 
 import ph.esrconstruction.esrsys.esrsysmobile.MainActivity;
 import ph.esrconstruction.esrsys.esrsysmobile.R;
+import ph.esrconstruction.esrsys.esrsysmobile.events.MessageEvent;
 
 public class NFCWriteFragment extends DialogFragment {
 
@@ -58,6 +61,7 @@ public class NFCWriteFragment extends DialogFragment {
     @Override
     public void onDetach() {
         super.onDetach();
+        EventBus.getDefault().post(new MessageEvent(MessageEvent.Messages.NFCWriteFragment_closed));
         mListener.onDialogDismissed();
     }
 

@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -21,6 +22,10 @@ import androidx.navigation.ui.NavigationUI;
 import com.google.android.material.navigation.NavigationView;
 import com.orhanobut.logger.Logger;
 
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+
 import java.util.concurrent.Callable;
 
 import io.realm.Realm;
@@ -28,6 +33,7 @@ import io.realm.RealmChangeListener;
 import io.realm.RealmResults;
 
 
+import ph.esrconstruction.esrsys.esrsysmobile.cards.EmployeeCardData;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.HomeViewModel;
 
@@ -167,10 +173,17 @@ public class HomeFragment extends Fragment {
 
 
 
+    @Override
+    public void onStop() {
+        super.onStop();
+        EventBus.getDefault().unregister(this);
+    }
+
 
     @Override
     public void onStart() {
         super.onStart();
+        EventBus.getDefault().register(this);
         Logger.d("start");
         mViewModel.getemployeesCount().observe(this, new Observer<Integer>() {
             @Override
@@ -199,4 +212,16 @@ public class HomeFragment extends Fragment {
         // Close the Realm instance.
         realm.close();
     }
+
+
+    // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEmployeeCardData(EmployeeCardData cd) {
+        Toast.makeText(getActivity(), "Employee card readxxy", Toast.LENGTH_SHORT).show();
+        Logger.t(TAG).d(cd.IDNumber);
+
+        HomeFragmentDirections.ActionHomeFragmentToEmployeeFragment action =  HomeFragmentDirections.actionHomeFragmentToEmployeeFragment(cd.EmployeeID);
+        navController.navigate(action);
+    }
+
 }

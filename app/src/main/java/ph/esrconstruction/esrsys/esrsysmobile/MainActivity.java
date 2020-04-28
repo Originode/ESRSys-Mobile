@@ -5,28 +5,22 @@ import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.hardware.usb.UsbManager;
-import android.nfc.FormatException;
 import android.nfc.NdefMessage;
-import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.MifareClassic;
-import android.nfc.tech.Ndef;
-import android.nfc.tech.NdefFormatable;
-import android.nfc.tech.NfcA;
 import android.os.Bundle;
 import android.os.Parcelable;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Toast;
-import org.joda.time.DateTime;
+import android.widget.Switch;
 
 
+import com.fatboyindustrial.gsonjodatime.Converters;
 import com.google.android.material.navigation.NavigationView;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.JsonParseException;
 import com.orhanobut.logger.Logger;
 
 import androidx.annotation.NonNull;
@@ -42,36 +36,37 @@ import androidx.navigation.ui.NavigationUI;
 
 
 import org.greenrobot.eventbus.EventBus;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.ndeftools.Record;
-import org.ndeftools.externaltype.AndroidApplicationRecord;
-import org.nfctools.utils.NfcUtils;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
+import org.joda.time.DateTime;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.Charset;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
-import java.util.Random;
-
+import io.realm.Realm;
+import io.realm.RealmResults;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.CardData;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.EmployeeCardData;
-import ph.esrconstruction.esrsys.esrsysmobile.events.NFCReadEvent;
+import ph.esrconstruction.esrsys.esrsysmobile.events.MessageEvent;
+import ph.esrconstruction.esrsys.esrsysmobile.events.TimerEvent;
+import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NFCReadFragment;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NFCWriteFragment;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NfcListener;
+import ph.esrconstruction.esrsys.esrsysmobile.utils.etc;
+import ph.esrconstruction.esrsys.esrsysmobile.utils.nfcUtils;
 
 import com.suprema.BioMiniFactory;
-import com.suprema.CaptureResponder;
 import com.suprema.IBioMiniDevice;
-import com.suprema.IUsbEventHandler;
-import com.telpo.tps550.api.fingerprint.FingerPrint;
 
 public class MainActivity extends AppCompatActivity implements
                                     NavigationView.OnNavigationItemSelectedListener, NfcListener {
@@ -282,488 +277,147 @@ public class MainActivity extends AppCompatActivity implements
             mNfcAdapter.disableForegroundDispatch(this); //stop nfc listener
     }
 
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        EventBus.getDefault().register(this);
+
+    }
+    @Override
+    public void onStop() {
+        EventBus.getDefault().unregister(this);
+        super.onStop();
+    }
+
     @Override
     public void onNewIntent(Intent intent) { // this method is called when an NFC tag is scanned
+
         Logger.t(TAG).d("onNewIntent: "+intent.getAction());
         byte[] tagId = intent.getByteArrayExtra(NfcAdapter.EXTRA_ID);
-        Logger.t(TAG).d(bytesToHexString(tagId));
-        Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
+        Logger.t(TAG).d(etc.bytesToHexString(tagId));
+
         // check for NFC related actions
         if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
 
         } else {
             // ignore
         }
-        /*
-            NdefMessage[] messages = getNdefMessages(intent);
-            intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
-            if (messages != null) {
-                for (int i = 0; i < messages.length; i++) {
-                    NdefMessage message = messages[i];
-                    NdefRecord[] records = message.getRecords();
-                    for (int j = 0; j < records.length; j++) {
-                        NdefRecord record = records[j];
-                        // TODO Process the individual records.
-                        String text = new String(record.getPayload());
-                        Logger.t(TAG).d(text);
-                    }
-                }
-            }
-*/
 
-            JSONObject json = new JSONObject();
+            //formatMifareClassicToEmployeeCard(intent);
+        nfcUtils.readCard(intent, (checkHash, card_type, info) -> {
+            Gson g = Converters.registerDateTime(new GsonBuilder()).setLenient().create();
             try {
-                json.put("TagType","ESR-Employee");
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
+                if(checkHash){
+                    switch (card_type){
+                        case CardData.CardTypes.EMPLOYEE:
+                            EmployeeCardData ecd = g.fromJson(info, EmployeeCardData.class);
+                            ecd.intent = intent;
+                            Logger.d(ecd.IDNumber + " " + ecd.Name);
+                            Realm realmz = Realm.getInstance(ESRSys.getEsrConfig());
+                            realmz.executeTransaction(inRealm -> {
+                                Employee e = inRealm.where(Employee.class).equalTo("EmployeeID", ecd.EmployeeID).findFirst();
+                                if (e != null) {
+                                    Logger.d("set scanned");
+                                    e.setFlags_cardScanned(true);
+                                    e.setLastScanned(DateTime.now().toDate());
 
-            //formatTag(tag, new NdefMessage(mimeRecord));
-
-        try {
-            json.put("IDNumber","2020333355");
-            json.put("LastName","Ababa");
-            json.put("FirstName","Ralph");
-
-            JSONObject eData = new JSONObject();
-            eData.put("UpdateFingerprint", 1);
-            DateTime dt = new DateTime();
-            DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss");
-            String dtStr = fmt.print(dt);
-            eData.put("LastScanned", dtStr);
-            eData.put("LastTerminal", "UNKNOWN-000");
-
-            json.put("eData", eData);
-
-            EmployeeCardData ec = new EmployeeCardData(bytesToHexString(tagId),"2020333355","Ababa","Ralph");
-
-            GsonBuilder builder = new GsonBuilder();
-            Gson gson = builder.create();
-
-
-            String stringData = gson.toJson(ec);
-            Logger.d(stringData);
-
-
-            Logger.d("data size = " + stringData.getBytes(Charset.forName("US-ASCII")).length);
-            byte[][] xdivideArray = divideArray(stringData.getBytes(Charset.forName("US-ASCII")),16);
-            Logger.d("chunks = " + xdivideArray.length);
-            int sectorstowrite = (int) Math.ceil(((float)xdivideArray.length+1)/3);
-            int ccd = 0;
-            Logger.d("sectors to use = " + sectorstowrite);
-
-            MifareClassic mif = MifareClassic.get(tag);
-            int bs = MifareClassic.BLOCK_SIZE;
-
-            int ttype = mif.getType();
-            Logger.d("MifareClassic tag type: " + ttype);
-
-            int tsize = mif.getSize();
-            Logger.t(TAG).d( "tag size: " + tsize);
-
-            int s_len = mif.getSectorCount();
-            Logger.t(TAG).d( "tag sector count: " + s_len);
-
-            int b_len = mif.getBlockCount();
-            Logger.t(TAG).d( "tag block count: " + b_len);
-
-
-            try { //write
-                mif.connect();
-                if (mif.isConnected()){
-
-                    for(int i=0; i< sectorstowrite+1; i++){
-
-                        boolean isAuthenticated = bruteAuthenticateSectorWithKeyA(mif,i);
-
-
-                        if(isAuthenticated && i>0) {
-                            for(int j=0; j< mif.getBlockCountInSector(i)-1; j++) {
-                                if(ccd >= xdivideArray.length) break;
-                                int block_index = mif.sectorToBlock(i)+j;
-                                if(i==1 && j==0){ //size block, write number of sectors being used in card
-                                    Logger.d("writing size block =  " + xdivideArray.length + " sector " + i + " block " + j + " index:" + block_index);
-                                    mif.writeBlock(block_index, ByteBuffer.allocate(16).order(ByteOrder.nativeOrder()).putInt(xdivideArray.length).array());
-                                }else{ //write blocks
-                                   // Logger.d("writing chunk number " + (ccd+1) + "/"+ xdivideArray.length +" sector " + i + " block " + j + " index:" + block_index);
-                                    mif.writeBlock(block_index, xdivideArray[ccd]);
-                                    ccd++;
+                                    e.setRemarks(ecd.Message);
                                 }
-                            }
-                        }
+                            });
+                            realmz.close();
+                            EventBus.getDefault().post(ecd);
 
-
-                        }
+                        default:
+                            //bytesToHexString(tagId)
+                            CardData cd = g.fromJson(info, CardData.class);
+                            cd.intent = intent;
+                            EventBus.getDefault().post(cd);
                     }
-
-                mif.close();
-
-            } catch (IOException e) {
+                }else{
+                    Logger.d("unformatted card");
+                    CardData unformattedCard = new CardData("xxx",intent);
+                    unformattedCard.CardType = CardData.CardTypes.UNKNWON;
+                    EventBus.getDefault().post(unformattedCard);
+                }
+            }
+            catch (JsonParseException e) {
+                e.printStackTrace();
+            }
+            catch (IllegalArgumentException e){
                 e.printStackTrace();
             }
 
 
-ccd = 0;
-            try { //read
-                mif.connect();
-                if (mif.isConnected()){
-
-                    ByteArrayOutputStream outputStream = new ByteArrayOutputStream( );
-
-                    int sectors_to_read = s_len-1;
-                    int blocks_to_read = (sectors_to_read*3)+1;
-                    for(int i=0; i< sectors_to_read+1; i++){
-
-                        boolean isAuthenticated = bruteAuthenticateSectorWithKeyA(mif,i);
-
-                        if(isAuthenticated && i>0) {
-                            for(int j=0; j< mif.getBlockCountInSector(i)-1; j++) {
-                                if(ccd >= blocks_to_read)  break;
-                                int block_index = mif.sectorToBlock(i)+j;
-                                if(i==1 && j==0){ //size block,
-                                    //mif.writeBlock(block_index, ByteBuffer.allocate(16).order(ByteOrder.nativeOrder()).putInt(sectorstowrite).array());
-
-                                    byte[] block = mif.readBlock(block_index);
-                                    ByteBuffer buffer = ByteBuffer.wrap(block);
-                                    blocks_to_read = buffer.order(ByteOrder.nativeOrder()).getInt();
-                                    sectors_to_read  = (int) Math.ceil(((float)blocks_to_read+1)/3);
-                                    //Logger.d("reading size block = " + blocks_to_read  + " sectors to read = " + sectors_to_read);
-                                    //outputStream.write( block );
-                                }else{ //read blocks
-                                    //Logger.d("reading chunk number " + (ccd+1) + " sector " + i + " block " + j + " index:" + block_index);
-                                    byte[] block = mif.readBlock(block_index);
-                                    outputStream.write( block );
-                                    ccd++;
-                                }
-                            }
-                        }
-
-                    }
-
-                    byte c[] = outputStream.toByteArray( );
-                    String data = bytesToHexString(c);
-                    String info = new String(c);
-                    Logger.t(TAG).d( data);
-                    Logger.t(TAG).d( info);
-
-
-
-                    JsonObject jsonObject = new JsonParser().parse(info).getAsJsonObject();
-                    String CardType = jsonObject.has("CardType") ? jsonObject.get("CardType").getAsString() : "unknown";
-                    if(CardType.equals("Card")){
-                        CardData cd = new CardData(bytesToHexString(tagId));
-                    }else if(CardType.equals("EmployeeCard")){
-                        EmployeeCardData cd = new EmployeeCardData(bytesToHexString(tagId));
-                        cd.parseJsonToMe(info);
-                        Logger.d(cd.IDNumber + " " + cd.LastName);
-                    }
-
-
-                }
-                mif.close();
-
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            
-
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
-    }
-
-    static String getAlphaNumericString(int n)
-    {
-
-        // length is bounded by 256 Character
-        byte[] array = new byte[256];
-        new Random().nextBytes(array);
-
-        String randomString
-                = new String(array, Charset.forName("US-ASCII"));
-
-        // Create a StringBuffer to store the result
-        StringBuffer r = new StringBuffer();
-
-        // Append first 20 alphanumeric characters
-        // from the generated random String into the result
-        for (int k = 0; k < randomString.length(); k++) {
-
-            char ch = randomString.charAt(k);
-
-            if (((ch >= 'a' && ch <= 'z')
-                    || (ch >= 'A' && ch <= 'Z')
-                    || (ch >= '0' && ch <= '9'))
-                    && (n > 0)) {
-
-                r.append(ch);
-                n--;
-            }
-        }
-
-        // return the resultant string
-        return r.toString();
-    }
-
-    private boolean bruteAuthenticateSectorWithKeyA(MifareClassic mif, int sectorNumber) throws IOException {
-        if (mif.authenticateSectorWithKeyA(sectorNumber, MifareClassic.KEY_MIFARE_APPLICATION_DIRECTORY)) {
-            return true;
-        } else if (mif.authenticateSectorWithKeyA(sectorNumber, MifareClassic.KEY_DEFAULT)) {
-            return true;
-        } else if (mif.authenticateSectorWithKeyA(sectorNumber,MifareClassic.KEY_NFC_FORUM)) {
-            return true;
-        } else {
-            Logger.d( "Authorization denied for sector " + sectorNumber);
-            return false;
-        }
-    }
-    public static byte[][] divideArray(byte[] source, int chunksize) {
-
-        byte[][] ret = new byte[(int)Math.ceil(source.length / (double)chunksize)][chunksize];
-
-        int start = 0;
-
-        for(int i = 0; i < ret.length; i++) {
-            ret[i] = Arrays.copyOfRange(source,start, start + chunksize);
-            start += chunksize ;
-        }
-
-        return ret;
-    }
-
-    protected void onNewIntentx(Intent intent) {
-        Logger.t(TAG).d("onNewIntent: "+intent.getAction());
-        Tag tag;
-
-        Toast.makeText(this, getString(R.string.message_tag_detected), Toast.LENGTH_SHORT).show();
-        byte[] tagId = intent.getByteArrayExtra(NfcAdapter.EXTRA_ID);
-        Logger.t(TAG).d(bytesToHexString(tagId));
-
-        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(intent.getAction()) || NfcAdapter.ACTION_TECH_DISCOVERED.equals(intent.getAction())) { //todo: make this work
-            tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            if(tag != null) {
-                Ndef ndef = Ndef.get(tag);
-                Logger.d(ndef.getType());
-                Logger.d(ndef.getTag());
-
-
-                NdefMessage[] messages = getNdefMessages(intent);
-                        intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
-                if (messages != null) {
-                    for (int i = 0; i < messages.length; i++) {
-                        NdefMessage message = messages[i];
-                        NdefRecord[] records = message.getRecords();
-                        for (int j = 0; j < records.length; j++) {
-                            NdefRecord record = records[j];
-                            // TODO Process the individual records.
-                            String text = new String(record.getPayload());
-                            Logger.t(TAG).d(text);
-                        }
-                    }
-                }
-
-                JSONObject json = new JSONObject();
-                try {
-                    json.put("TagType","Employee");
-                    JSONObject employee = new JSONObject();
-                    employee.put("EmployeeID", "20000001");
-                    employee.put("FirstName", "John");
-                    employee.put("LastName", "Reese");
-
-/*
-                    JSONObject eData = new JSONObject();
-                    eData.put("UpdateFingerprint", 1);
-                    SimpleDateFormat format = new SimpleDateFormat("Z");
-                    Date date = new Date();
-                    eData.put("LastScanned", "/Date(" + String.valueOf(date.getTime()) + format.format(date) + ")/");
-                    eData.put("LastTerminal", "UNKNOWN-000");
-
-                    employee.put("eData", eData);
-                    */
-                    json.put("employee", employee);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-                //JSONObject mainObject = new JSONObject(Your_Sring_data);
-                //JSONObject uniObject = mainObject.getJSONObject("university");
-                //String  uniName = uniObject.getString("name");
-               // String uniURL = uniObject.getString("url");
-                NdefRecord mimeRecord = NdefRecord.createMime("text/plain", json.toString().getBytes(Charset.forName("US-ASCII")));
-                writeMessage(tag,new NdefMessage(mimeRecord));
-               // writeToNfc(ndef, json.toString());
-                if (isDialogDisplayed) {
-
-                    if (isWrite) {
-
-                        //String messageToWrite = mEtMessage.getText().toString();
-                        //mNfcWriteFragment = (NFCWriteFragment) getFragmentManager().findFragmentByTag(NFCWriteFragment.TAG);
-                        // mNfcWriteFragment.onNfcDetected(ndef,messageToWrite);
-
-                    } else {
-
-                        // mNfcReadFragment = (NFCReadFragment)getFragmentManager().findFragmentByTag(NFCReadFragment.TAG);
-                        mNfcReadFragment.onNfcDetected(ndef);
-                        Logger.d("REAAAAAAAAAAAD");
-                    }
-                }
-            }
-        }else if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
-            Logger.t(TAG).d("Detected Unformatted tag... ");
-            tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
-            NdefFormatable format = NdefFormatable.get(tag);
-
-            JSONObject json = new JSONObject();
-
-
-            try {
-
-
-                NfcA nfcA = NfcA.get(tag);
-                if (nfcA != null) {
-                    try {
-                        nfcA.connect();
-                        nfcA.transceive(new byte[] {
-                                (byte)0xA2,  // WRITE
-                                (byte)0x03,  // page = 3
-                                (byte)0xE1, (byte)0x10, (byte)0x06, (byte)0x00  // capability container (mapping version 1.0, 48 bytes for data available, read/write allowed)
-                        });
-                        nfcA.transceive(new byte[] {
-                                (byte)0xA2,  // WRITE
-                                (byte)0x04,  // page = 4
-                                (byte)0x03, (byte)0x00, (byte)0xFE, (byte)0x00  // empty NDEF TLV, Terminator TLV
-                        });
-                    } catch (Exception e) {
-                    } finally {
-                        try {
-                            nfcA.close();
-                            Logger.d("format success");
-                        } catch (Exception e) {
-                        }
-                    }
-                }
-
-                json.put("TagType","ESR-Blank");
-
-                NdefRecord mimeRecord = NdefRecord.createMime("text/plain", json.toString().getBytes(Charset.forName("US-ASCII")));
-
-                 writeMessage(tag,new NdefMessage(mimeRecord));
-
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }
-
-
-
-    }
-
-
-    private void writeMessage(Tag tag, NdefMessage ndefMessage)
-    {
-        try
-        {
-            if (tag == null)
-            {
-                Logger.d("An Error has Occurred, Please Try Again");
-            }
-
-            Ndef ndef = Ndef.get(tag);
-
-            if (ndef == null)
-            {
-                formatTag(tag, ndefMessage);
-            }
-            else
-            {
-                ndef.connect();
-
-                if (!ndef.isWritable())
-                {
-                    Logger.d("Tag is not Writable");
-                    ndef.close();
-                    return;
-                }
-
-                ndef.writeNdefMessage(ndefMessage);
-                ndef.close();
-            }
-        }
-        catch (Exception e)
-        {
-            Logger.e("writeMessage", e.getMessage());
-        }
-    }
-
-    private void formatTag(Tag tag, NdefMessage ndefMessage)
-    {
-        NdefFormatable ndefFormatable = NdefFormatable.get(tag);
-        if (tag == null)
-        {
-            Logger.d("Tag is not NDEF formatable");
-            return;
-        }
-        if (ndefFormatable == null)
-        {
-            Logger.d("Tag is not NDEF formatable");
-            return;
-        }
-
-        try
-        {
-            ndefFormatable.connect();
-            ndefFormatable.format(new NdefMessage(NdefRecord.createTextRecord("en", "ABCD")));
-            ndefFormatable.close();
-            Logger.d("Tag formatted successfuly!");
-
-            /*
-            Intent nextActivity = new Intent(MainActivity.this, MainActivity.class);
-            startActivityForResult(nextActivity, 0);
-            MainActivity.this.finish();
-            */
-
-        }
-        catch (Exception e)
-        {
-            Logger.e("formatTag: ", e.getMessage());
-            e.printStackTrace();
-        }
-
-
-    }
-    private static NdefMessage getTestMessage() {
-        byte[] mimeBytes = "application/com.android.cts.verifier.nfc"
-                .getBytes(Charset.forName("US-ASCII"));
-        byte[] id = new byte[] {1, 3, 3, 7};
-        byte[] payload = "CTS Verifier NDEF Push Tag".getBytes(Charset.forName("US-ASCII"));
-        return new NdefMessage(new NdefRecord[] {
-                new NdefRecord(NdefRecord.TNF_MIME_MEDIA, mimeBytes, id, payload)
         });
+        closeReadFragment();
+
     }
-    private NdefMessage[] getNdefMessages(Intent intent) {
-        Parcelable[] rawMessages = intent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
-        if (rawMessages != null) {
-            NdefMessage[] messages = new NdefMessage[rawMessages.length];
-            for (int i = 0; i < messages.length; i++) {
-                messages[i] = (NdefMessage) rawMessages[i];
-            }
-            return messages;
-        } else {
-            return null;
+
+
+
+
+
+
+
+
+
+
+    private void showWriteFragment() {
+        if (mNfcWriteFragment == null) {
+            mNfcWriteFragment.dismiss();
+        }
+            mNfcWriteFragment = NFCWriteFragment.newInstance();
+        mNfcWriteFragment.show(getSupportFragmentManager(),NFCWriteFragment.TAG);
+    }
+    private void closeWriteFragment() {
+        if (mNfcWriteFragment == null) {
+            mNfcWriteFragment.dismiss();
         }
     }
 
-    private String bytesToHexString(byte[] src) {
-        StringBuilder stringBuilder = new StringBuilder("0x");
-        if (src == null || src.length <= 0) {
-            return null;
+    private void showReadFragment() {
+      //  ((MainActivity)getActivity()).mNfcReadFragment = (NFCReadFragment) getFragmentManager().findFragmentByTag(NFCReadFragment.TAG);
+        if (mNfcReadFragment != null) {
+            mNfcReadFragment.dismiss();
         }
-        char[] buffer = new char[2];
-        for (int i = 0; i < src.length; i++) {
-            buffer[0] = Character.forDigit((src[i] >>> 4) & 0x0F, 16);
-            buffer[1] = Character.forDigit(src[i] & 0x0F, 16);
-            stringBuilder.append(buffer);
+           mNfcReadFragment = NFCReadFragment.newInstance();
+        mNfcReadFragment.show(getSupportFragmentManager(),NFCReadFragment.TAG);
+
+    }
+    private void closeReadFragment() {
+        //  ((MainActivity)getActivity()).mNfcReadFragment = (NFCReadFragment) getFragmentManager().findFragmentByTag(NFCReadFragment.TAG);
+        if (mNfcReadFragment != null) {
+            mNfcReadFragment.dismiss();
         }
-        return stringBuilder.toString();
     }
 
+    // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onMessageEvent(MessageEvent m) {
+        Logger.t(TAG + "-onMessageEvent").d(m.message);
+
+        switch(m.message){
+            case MessageEvent.Messages.NFCWriteFragment_closed:
+            default:
+
+        }
+
+
+    }
+
+    // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onTimerEvent(TimerEvent t) {
+
+        Logger.t(TAG + "-onTimerEvent").d(t.message);
+        switch(t.message){
+            case TimerEvent.Messages.EmployeeSync:
+                Logger.t(TAG).d("next employee sync in: " + t.duration + " miliseconds");
+            default:
+
+        }
+
+
+    }
 }

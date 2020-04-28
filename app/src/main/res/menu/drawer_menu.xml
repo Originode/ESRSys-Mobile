@@ -23,6 +23,11 @@
             android:id="@+id/menu_login_logout"
             android:icon="@drawable/ic_save_black_24dp"
             android:title="Login" />
+        <item
+            android:id="@+id/app_bar_switch"
+            android:title="Switch"
+            app:actionLayout="@layout/switch_item"
+            app:showAsAction="always" />
     </group>
 
 </menu>

@@ -19,11 +19,14 @@ import android.widget.Toast;
 import java.io.ByteArrayOutputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 
+import org.greenrobot.eventbus.EventBus;
+import org.joda.time.DateTime;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -44,6 +47,7 @@ import io.realm.Realm;
 import io.realm.RealmResults;
 import ph.esrconstruction.esrsys.esrsysmobile.ESRSys;
 import ph.esrconstruction.esrsys.esrsysmobile.data.model.LoggedInUser;
+import ph.esrconstruction.esrsys.esrsysmobile.events.TimerEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 
 import static java.lang.Math.max;
@@ -174,26 +178,31 @@ public class ESREmployeeRealmSyncService extends Service {
                                                 //update existing employee
                                                 try {
                                                     employee = inRealm.where(Employee.class).equalTo("EmployeeID", xid).findFirst();
-                                                    if (obj.has("LastUpdate") && obj.getString("LastUpdate")!= "null") {
-                                                        String date_modified = obj.getString("LastUpdate");
-                                                        @SuppressLint("SimpleDateFormat") SimpleDateFormat dateParser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
-                                                        Date xxxdate = dateParser.parse(date_modified);
-                                                        if (employee.getLastUpdate().compareTo(xxxdate) < 0) {
-                                                            // Get Data and save on Realm DB
-                                                            // employee.setEmployeeID(obj.getLong("EmployeeID"));
-                                                            //employee.setQuantity(obj.getInt("quantity"));
-                                                            employee.setIDNumber(obj.getString("Idnumber"));
-                                                            employee.setName(obj.getString("Name"));
-                                                            employee.setImageLoaded(0);
-                                                            employee.setLastUpdate(xxxdate);
+                                                    if(employee != null){
+                                                        if (obj.has("LastUpdate") && obj.getString("LastUpdate")!= "null") {
+                                                            String date_modified = obj.getString("LastUpdate");
+                                                            @SuppressLint("SimpleDateFormat") SimpleDateFormat dateParser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+                                                            Date xxxdate = dateParser.parse(date_modified);
+                                                            if (employee.getLastUpdate().compareTo(xxxdate) < 0) {
+                                                                // Get Data and save on Realm DB
+                                                                // employee.setEmployeeID(obj.getLong("EmployeeID"));
+                                                                //employee.setQuantity(obj.getInt("quantity"));
+                                                                employee.setIDNumber(obj.getString("Idnumber"));
+                                                                employee.setName(obj.getString("Name"));
+                                                                employee.setImageLoaded(0);
+                                                                employee.setLastUpdate(xxxdate);
 
-                                                            employee.setProjectName(obj.optString("ProjectAssignmentProjectName", ""));
-                                                            employee.setRoleName(obj.optString("ProjectAssignmentRoleName", ""));
-                                                            employee.setStatusName(obj.optString("ProjectAssignmentStatusName", ""));
+                                                                employee.setLastScanned(new DateTime( 2020, 1, 1, 0, 0 ).toDate());
 
-                                                            updatedCount++;
+                                                                employee.setProjectName(obj.optString("ProjectAssignmentProjectName", ""));
+                                                                employee.setRoleName(obj.optString("ProjectAssignmentRoleName", ""));
+                                                                employee.setStatusName(obj.optString("ProjectAssignmentStatusName", ""));
+
+                                                                updatedCount++;
+                                                            }
                                                         }
                                                     }
+
 
                                                 } catch (ParseException e) {
                                                     e.printStackTrace();
@@ -222,7 +231,19 @@ public class ESREmployeeRealmSyncService extends Service {
                                                         @SuppressLint("SimpleDateFormat") SimpleDateFormat dateParser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
                                                         employee.setLastUpdate(dateParser.parse(date_modified));
 
+                                                    }else{
+                                                        employee.setLastUpdate(new DateTime( 2020, 1, 1, 0, 0 ).toDate());
                                                     }
+                                                    if (obj.has("LastScanned")) {
+                                                        String date_scanned = obj.getString("LastScanned");
+
+                                                        @SuppressLint("SimpleDateFormat") SimpleDateFormat dateParser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
+                                                        employee.setLastScanned(dateParser.parse(date_scanned));
+
+                                                    }else{
+                                                        employee.setLastScanned(new DateTime( 2020, 1, 1, 0, 0 ).toDate());
+                                                    }
+
                                                     addedCount++;
                                                 } catch (ParseException e) {
                                                     e.printStackTrace();
@@ -326,7 +347,7 @@ public class ESREmployeeRealmSyncService extends Service {
         public void run() {
             long periodicEmployeeUpdateDelay = 120*1000;
             periodicEmployeeHandler.postDelayed(periodicEmployeeUpdate, periodicEmployeeUpdateDelay - SystemClock.elapsedRealtime()%1000);
-
+            EventBus.getDefault().post(new TimerEvent(TimerEvent.Messages.EmployeeSync,System.nanoTime(),periodicEmployeeUpdateDelay));
             // whatever you want to do below
 
            employeeUpdate();

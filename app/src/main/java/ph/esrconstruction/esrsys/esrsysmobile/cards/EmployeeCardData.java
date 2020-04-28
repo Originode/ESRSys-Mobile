@@ -1,35 +1,34 @@
 package ph.esrconstruction.esrsys.esrsysmobile.cards;
 
+import android.content.Intent;
+
+import com.fatboyindustrial.gsonjodatime.Converters;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 public class EmployeeCardData extends CardData {
 
-    public String LastName = "";
-    public String FirstName = "";
+    public String Name = "";
     public String IDNumber = "";
+    public long EmployeeID;
 
 
-    public EmployeeCardData(String _CardID) {
-        super(_CardID);
-        CardType = "EmployeeCard";
+    public EmployeeCardData(String _CardID, Intent intent) {
+        super(_CardID, intent);
+        this.CardType =  CardTypes.EMPLOYEE;
+        this.Message = "...";
     }
-    public EmployeeCardData(String _CardID, String _IDNumber, String _LastName, String _FirstName) {
-        this(_CardID);
+    public EmployeeCardData(String _CardID, String _IDNumber, String _Name, long _EmployeeID, Intent intent) {
+        this(_CardID, intent);
         IDNumber = _IDNumber;
-        LastName = _LastName;
-        FirstName = _FirstName;
+        Name = _Name;
+
+        EmployeeID = _EmployeeID;
+    }
+    public EmployeeCardData(CardData cardData) {
+        this(cardData.CardID,"","",0,cardData.intent);
     }
 
-    public void parseJsonToMe(String json){
-        Gson g = new Gson();
-        EmployeeCardData ecc = g.fromJson(json, EmployeeCardData.class);
-        this.CardID = ecc.CardID;
-        this.CardType = ecc.CardType;
-
-        this.IDNumber = ecc.IDNumber;
-        this.LastName = ecc.LastName;
-        this.FirstName = ecc.FirstName;
-    }
 }

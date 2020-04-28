@@ -1,11 +1,14 @@
 package ph.esrconstruction.esrsys.esrsysmobile;
-
+import com.orhanobut.logger.Logger;
 import android.content.Context;
 import android.os.Bundle;
 
 import androidx.appcompat.widget.SearchView;
 import androidx.fragment.app.Fragment;
+import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
+import androidx.navigation.NavController;
+import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -16,10 +19,16 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
+
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 
 import io.realm.Realm;
 import io.realm.RealmChangeListener;
 import io.realm.RealmConfiguration;
+import ph.esrconstruction.esrsys.esrsysmobile.cards.EmployeeCardData;
 import ph.esrconstruction.esrsys.esrsysmobile.dummy.DummyContent;
 import ph.esrconstruction.esrsys.esrsysmobile.dummy.DummyContent.DummyItem;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
@@ -49,9 +58,11 @@ public class EmployeesFragment extends Fragment {
     private OnListFragmentInteractionListener mListener;
 
 
+    public NavController navController;
+
     private EmployeesRecyclerViewAdapter employeeAdapter;
     private Realm realm;
-
+    public static final String TAG = "EmployeesFragment";
     private EmployeesRecyclerViewAdapter mAdapter;
 
     /**
@@ -106,6 +117,7 @@ public class EmployeesFragment extends Fragment {
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_employeesitem_list, container, false);
 
+        navController = Navigation.findNavController(getActivity(), R.id.nav_host_fragment);
 
         RealmResults<Employee> results;
         String title;
@@ -182,6 +194,22 @@ public class EmployeesFragment extends Fragment {
         mListener = null;
     }
 
+
+
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        EventBus.getDefault().register(this);
+
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        EventBus.getDefault().unregister(this);
+    }
+
     /**
      * This interface must be implemented by activities that contain this
      * fragment to allow an interaction in this fragment to be communicated
@@ -195,5 +223,20 @@ public class EmployeesFragment extends Fragment {
     public interface OnListFragmentInteractionListener {
         // TODO: Update argument type and name
         void onListFragmentInteraction(Employee item);
+
+
+    }
+
+
+
+
+    // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onEmployeeCardData(EmployeeCardData cd) {
+        Toast.makeText(getActivity(), "Employee card readxxx", Toast.LENGTH_SHORT).show();
+        Logger.t(TAG).d(cd.IDNumber);
+
+        EmployeesFragmentDirections.ActionEmployeesFragmentToEmployeeFragment action =  EmployeesFragmentDirections.actionEmployeesFragmentToEmployeeFragment(cd.EmployeeID);
+        navController.navigate(action);
     }
 }

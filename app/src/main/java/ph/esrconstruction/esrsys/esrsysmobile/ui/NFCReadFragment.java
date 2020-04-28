@@ -15,10 +15,13 @@ import android.widget.TextView;
 
 import com.orhanobut.logger.Logger;
 
+import org.greenrobot.eventbus.EventBus;
+
 import java.io.IOException;
 
 import ph.esrconstruction.esrsys.esrsysmobile.MainActivity;
 import ph.esrconstruction.esrsys.esrsysmobile.R;
+import ph.esrconstruction.esrsys.esrsysmobile.events.MessageEvent;
 
 
 public class NFCReadFragment extends DialogFragment {
@@ -56,7 +59,9 @@ public class NFCReadFragment extends DialogFragment {
     @Override
     public void onDetach() {
         super.onDetach();
+        EventBus.getDefault().post(new MessageEvent("NFC Read close"));
         mListener.onDialogDismissed();
+
     }
 
     public void onNfcDetected(Ndef ndef){

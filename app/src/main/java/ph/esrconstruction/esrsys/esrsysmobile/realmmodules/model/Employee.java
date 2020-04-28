@@ -6,6 +6,8 @@ import android.graphics.BitmapFactory;
 
 import androidx.annotation.Nullable;
 
+import org.joda.time.DateTime;
+
 import io.realm.RealmObject;
 import io.realm.annotations.Required;
 import io.realm.annotations.PrimaryKey;
@@ -37,7 +39,20 @@ public class Employee extends RealmObject {
     @Nullable
     private String StatusName= "";
 
-    private int xxxxxxxxxx;
+
+    @Nullable
+    private String Remarks= "";
+
+    @Nullable
+    private boolean flags_cardScanned= false;
+
+    @Nullable
+    private boolean flags_writeCard= false;
+
+    @Nullable
+    private Date LastScanned;
+
+    private int xxxxxxxxxxxxxx;
 
     public Employee(){
 
@@ -47,6 +62,13 @@ public class Employee extends RealmObject {
         this.IDNumber = IDNumber;
         this.Name = Name;
         this.ImageLoaded = 0;
+
+        this.flags_cardScanned = false;
+        this.flags_writeCard = false;
+
+        this.LastScanned = (new DateTime( 2020, 1, 1, 0, 0 ).toDate());
+
+        this.LastUpdate = (new DateTime( 2020, 1, 1, 0, 0 ).toDate());
     }
 
 
@@ -76,7 +98,7 @@ public class Employee extends RealmObject {
     public void setIDNumber(String IDNumber) { this.IDNumber = IDNumber; }
 
     public Date getLastUpdate() { return this.LastUpdate; }
-
+    public DateTime getLastUpdatex() { return new DateTime(this.LastUpdate); }
     public void setLastUpdate(Date LastUpdate) { this.LastUpdate = LastUpdate; }
 
     public byte[] getImage() { return this.Image; }
@@ -102,6 +124,45 @@ public class Employee extends RealmObject {
     public void loadImage(){
         String base_url = ESRSys.getInstance().getBaseURL();
 
+    }
+
+    public boolean isFlags_cardScanned() {
+        return flags_cardScanned;
+    }
+
+    public void setFlags_cardScanned(boolean flags_cardScanned) {
+        this.flags_cardScanned = flags_cardScanned;
+    }
+
+    public boolean isFlags_writeCard() {
+        return flags_writeCard;
+    }
+
+    public void setFlags_writeCard(boolean flags_writeCard) {
+        this.flags_writeCard = flags_writeCard;
+    }
+
+    @Nullable
+    public Date getLastScanned() {
+        return this.LastScanned;
+    }
+
+    @Nullable
+    public DateTime getLastScannedx() {
+        return new DateTime(this.LastScanned);
+    }
+
+    public void setLastScanned(@Nullable Date lastScanned) {
+        this.LastScanned = lastScanned;
+    }
+
+    @Nullable
+    public String getRemarks() {
+        return Remarks;
+    }
+
+    public void setRemarks(@Nullable String remarks) {
+        Remarks = remarks;
     }
 }
 

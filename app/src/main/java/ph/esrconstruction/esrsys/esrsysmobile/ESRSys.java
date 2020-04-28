@@ -102,7 +102,7 @@ public class ESRSys extends Application implements LifecycleOwner {
 
             Realm.init(getInstance());
             setEsrConfig(new RealmConfiguration.Builder()
-                    .name("esrdb-v010.realm")
+                    .name("esrdb-v011.realm")
                     .modules(Realm.getDefaultModule(), new ESRModules())
                     .deleteRealmIfMigrationNeeded()
                     .build());
