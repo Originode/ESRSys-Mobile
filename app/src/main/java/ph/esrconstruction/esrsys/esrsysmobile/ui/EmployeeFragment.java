@@ -1,19 +1,16 @@
 package ph.esrconstruction.esrsys.esrsysmobile.ui;
 
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.nfc.NfcAdapter;
-import android.nfc.Tag;
-import android.nfc.tech.MifareClassic;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProviders;
 
 import android.os.Handler;
@@ -26,32 +23,26 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.fatboyindustrial.gsonjodatime.Converters;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.orhanobut.logger.Logger;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 import org.joda.time.DateTime;
+import org.joda.time.Period;
 import org.joda.time.Seconds;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Objects;
 
 import io.realm.Realm;
+import io.realm.RealmList;
+import io.realm.RealmQuery;
 import io.realm.RealmResults;
 import ph.esrconstruction.esrsys.esrsysmobile.ESRSys;
 import ph.esrconstruction.esrsys.esrsysmobile.MainActivity;
@@ -59,8 +50,9 @@ import ph.esrconstruction.esrsys.esrsysmobile.R;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.CardData;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.EmployeeCardData;
 import ph.esrconstruction.esrsys.esrsysmobile.events.MessageEvent;
+import ph.esrconstruction.esrsys.esrsysmobile.fp.FingerPrintCaptureEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
-import ph.esrconstruction.esrsys.esrsysmobile.utils.nfcUtils;
+import ph.esrconstruction.esrsys.esrsysmobile.utils.NfcUtils;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -91,8 +83,10 @@ public class EmployeeFragment extends Fragment {
     private boolean isCardWrite = false;
 
 
-    private EditText mEtMessage;
+
     private Button mBtWrite;
+    private Button mBtnScanFP;
+
 
 
     public EmployeeFragment() {
@@ -159,15 +153,48 @@ public class EmployeeFragment extends Fragment {
 
     private void initViews(@NonNull View viewx) {
 
-        mEtMessage = (EditText) viewx.findViewById(R.id.et_message);
+
         mBtWrite = (Button) viewx.findViewById(R.id.btn_write);
-
-
-
-
         mBtWrite.setOnClickListener(view -> showWriteFragment());
 
+        mBtnScanFP = (Button) viewx.findViewById(R.id.btnScanFingerPrint);
+        mBtnScanFP.setOnClickListener(view -> EventBus.getDefault().post(new MessageEvent(MessageEvent.Messages.FingerPrintScanner_start)));
 
+        Button btnClearFingerPrints = (Button) viewx.findViewById(R.id.btnClearFingerPrints);
+        btnClearFingerPrints.setOnClickListener(view -> {
+            Realm realmz = Realm.getInstance(ESRSys.getEsrConfig());
+            realmz.executeTransaction(inRealm -> {
+                Employee e = inRealm.where(Employee.class).equalTo("EmployeeID", Objects.requireNonNull(mViewModel.getEmployee().getValue()).getEmployeeID()).findFirst();
+                if (e != null) {
+                    Logger.d("clear fingerprints");
+                    e.getFingerprintTemplates().clear();
+                    TextView fpCaptureMessageTextView = getView().findViewById(R.id.fpCaptureMessageTextView);
+                    fpCaptureMessageTextView.setText("fingerprints cleared");
+
+                    ImageView iv = getView().findViewById(R.id.imageFingerPrintPreview);
+                    Drawable myDrawable = ContextCompat.getDrawable(getContext(), R.drawable.ic_fingerprint_black_24dp);
+                    iv.setImageDrawable(myDrawable);
+
+                    TextView FpCountTextView = getView().findViewById(R.id.fpCountTextView);
+                    FpCountTextView.setText("0");
+                }
+            });
+            realmz.close();
+        });
+
+        Button btnVerifyFingerPrint = (Button) viewx.findViewById(R.id.btnVerifyFingerPrint);
+        btnVerifyFingerPrint.setOnClickListener(view -> EventBus.getDefault().post(new MessageEvent(MessageEvent.Messages.FingerPrintScanner_verify)));
+
+        TextView fpCaptureMessageTextView = getView().findViewById(R.id.fpCaptureMessageTextView);
+        fpCaptureMessageTextView.setText("");
+
+        TextView FpCountTextView = getView().findViewById(R.id.fpCountTextView);
+        FpCountTextView.setText("");
+       // EventBus.getDefault().post(ecd);
+
+        ImageView iv = getView().findViewById(R.id.imageFingerPrintPreview);
+        Drawable myDrawable = ContextCompat.getDrawable(getContext(), R.drawable.ic_fingerprint_black_24dp);
+        iv.setImageDrawable(myDrawable);
 
     }
 
@@ -195,16 +222,46 @@ public class EmployeeFragment extends Fragment {
             TextView StatusNameTextView = getView().findViewById(R.id.statusNameTextView);
             StatusNameTextView.setText(mViewModel.getEmployee().getValue().getStatusName());
 
+            TextView FpCountTextView = getView().findViewById(R.id.fpCountTextView);
+            ImageView iv = getView().findViewById(R.id.imageFingerPrintPreview);
+
+
+            if(mViewModel.getEmployee().getValue().getFingerprintTemplates() != null && mViewModel.getEmployee().getValue().getFingerprintTemplates().size() > 0){
+                FpCountTextView.setText(String.valueOf(mViewModel.getEmployee().getValue().getFingerprintTemplates().size()));
+              //  byte[] fp = mViewModel.getEmployee().getValue().getFingerprintTemplates().first();
+              //  if(fp.length > 0) iv.setImageBitmap(BitmapFactory.decodeByteArray(fp, 0, fp.length));
+
+            }else{
+                FpCountTextView.setText("0");
+
+            }
+
+
             TextView et_message = getView().findViewById(R.id.et_message);
             et_message.setText(mViewModel.getEmployee().getValue().getRemarks());
 
-            DateTime now = DateTime.now().minusSeconds(15);
+            DateTime now = DateTime.now().minusSeconds(60);
             DateTime dateTime = new DateTime(mViewModel.getEmployee().getValue().getLastScanned());// mViewModel.getEmployee().getValue().getLastScannedx();
-            Logger.d(now.toString());
-            Logger.d(mViewModel.getEmployee().getValue().getLastScanned().toString());
             Seconds seconds = Seconds.secondsBetween(now, dateTime); //dateTime - now
-            Logger.d(seconds.getSeconds());
-            if(seconds.getSeconds() > 10){
+            Period p = seconds.toPeriod();
+            PeriodFormatter YearsDaysHoursMinutes = new PeriodFormatterBuilder()
+                    .appendYears()
+                    .appendSuffix(" year", " years")
+                    .appendSeparator(" , ")
+                    .appendDays()
+                    .appendSuffix(" day", " days")
+                    .appendSeparator(" , ")
+                    .appendMinutes()
+                    .appendSuffix(" minute", " minutes")
+                    .appendSeparator(" and ")
+                    .appendSeconds()
+                    .appendSuffix(" second", " seconds")
+                    .toFormatter();
+
+
+            Logger.i(YearsDaysHoursMinutes.print(p) + " since card was scanned");
+
+            if(seconds.getSeconds() > 0){
                 isCardScanned = true;
                 Switch cardScanned = getView().findViewById(R.id.switch_cardScanned);
                 cardScanned.setChecked(isCardScanned);
@@ -354,7 +411,7 @@ public class EmployeeFragment extends Fragment {
         //t_message.setText("Google is your friend.", TextView.BufferType.EDITABLE);
         ec.Message = et_message.getText().toString();
 
-        if (nfcUtils.writeEmployeeCardToMifareClassic(ec.intent, ec)) {
+        if (NfcUtils.writeEmployeeCardToMifareClassic(ec.intent, ec)) {
             closeWriteFragment();
         }else{
             //handle error
@@ -411,6 +468,90 @@ public class EmployeeFragment extends Fragment {
 
 
     }
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void FingerPrintCaptureEvent(FingerPrintCaptureEvent fpce) {
+
+       if(mViewModel!=null && mViewModel.getEmployee().getValue()!=null){
+
+           if(fpce.capturedTemplate != null && mViewModel != null && mViewModel.getEmployee().getValue() != null){
+               Realm realmz = Realm.getInstance(ESRSys.getEsrConfig());
+               realmz.executeTransaction(inRealm -> {
+                   Employee e = inRealm.where(Employee.class).equalTo("EmployeeID", mViewModel.getEmployee().getValue().getEmployeeID()).findFirst();
+                   ByteBuffer capturedTemplateBB = ByteBuffer.wrap(fpce.capturedTemplate.data);
+                   Logger.d(capturedTemplateBB.capacity());
+                   if (e != null) {
+                       Boolean isMatched = false;
+                       long EmployeeID = e.getEmployeeID();
+                       TextView fpCaptureMessageTextView = getView().findViewById(R.id.fpCaptureMessageTextView);
+                       switch (fpce.mode){
+                           case FingerPrintCaptureEvent.Modes.CAPTURE:
+                               Logger.d("set fingerprint");
+                               RealmResults<Employee> es = inRealm.where(Employee.class).findAll();
+                               for (Employee ex : es) {
+                                   for (byte[] ft : ex.getFingerprintTemplates()) {
+                                       if(ESRSys.getInstance().mCurrentDevice.verify(
+                                               capturedTemplateBB.array(), capturedTemplateBB.capacity(),
+                                               ft, ft.length)) {
+                                           isMatched = true;
+                                           EmployeeID = ex.getEmployeeID();
+                                           break;
+                                       }
+                                   }
+                                   if(isMatched) break;
+                               }
+                               if(!isMatched  ||  (isMatched && EmployeeID == e.getEmployeeID())){
+                                   fpCaptureMessageTextView.setText("Fingerprint saved");
+                                   e.getFingerprintTemplates().add(capturedTemplateBB.array()); //add fingerprint
+                               }else{
+                                   fpCaptureMessageTextView.setText("Fingerprint already used");
+                               }
+
+                               break;
+
+                           case FingerPrintCaptureEvent.Modes.VERIFY:
+                               Logger.d("verify fingerprint");
+                                   for (byte[] ft : e.getFingerprintTemplates()) {
+                                       if(ESRSys.getInstance().mCurrentDevice.verify(
+                                               capturedTemplateBB.array(), capturedTemplateBB.capacity(),
+                                               ft, ft.length)) {
+                                           isMatched = true;
+                                           break;
+                                       }
+                                   }
+                               if(isMatched){
+                                   fpCaptureMessageTextView.setText("Fingerprint verified");
+                               }else{
+                                   fpCaptureMessageTextView.setText("Verify failed");
+                               }
+                               break;
+                           default:
+                               break;
+                       }
+
+                   }
+               });
+               realmz.close();
+
+           }
+
+           if(fpce.capturedImage != null && getView() != null) {
+               ImageView iv = getView().findViewById(R.id.imageFingerPrintPreview);
+
+               TextView FpCountTextView = getView().findViewById(R.id.fpCountTextView);
+               if(mViewModel.getEmployee().getValue().getFingerprintTemplates() != null){
+                   FpCountTextView.setText(String.valueOf(mViewModel.getEmployee().getValue().getFingerprintTemplates().size()));
+               }else{
+                   FpCountTextView.setText("0");
+               }
+               if(iv != null) {
+                   iv.setImageBitmap(fpce.capturedImage);
+               }
+           }
+
+       }
+
+    }
+
 
 
 }

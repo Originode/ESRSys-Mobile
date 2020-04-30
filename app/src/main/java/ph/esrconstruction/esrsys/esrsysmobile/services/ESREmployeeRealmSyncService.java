@@ -421,7 +421,7 @@ public class ESREmployeeRealmSyncService extends Service {
 
                 }
             }else{
-                Logger.i("waiting for network");
+                //Logger.i("waiting for network");
             }
         }
     };

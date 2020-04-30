@@ -28,6 +28,8 @@ import android.widget.AdapterView.OnItemClickListener;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.orhanobut.logger.Logger;
+
 public class ToolsFragment extends Fragment {
     GridView gridView;
     ArrayList<ToolsGridItem> gridArray ;
@@ -49,10 +51,10 @@ public class ToolsFragment extends Fragment {
         Bitmap userIcon = BitmapFactory.decodeResource(this.getResources(), R.drawable.ic_person_black_24dp);
 
         gridArray = new ArrayList<ToolsGridItem>();
-        gridArray.add(new ToolsGridItem(homeIcon,"Employees"));
-        gridArray.add(new ToolsGridItem(homeIcon,"DTR/Attendance"));
-        gridArray.add(new ToolsGridItem(homeIcon,"Equipment Update"));
-
+        gridArray.add(new ToolsGridItem(homeIcon,"Employees", ToolsGridItem.ToolsGridItems.EMPLOYEES));
+        gridArray.add(new ToolsGridItem(homeIcon,"DTR/Attendance", ToolsGridItem.ToolsGridItems.DTR));
+        gridArray.add(new ToolsGridItem(homeIcon,"Equipment Update", ToolsGridItem.ToolsGridItems.EQUIPMENT_UPDATE));
+        gridArray.add(new ToolsGridItem(homeIcon,"Settings", ToolsGridItem.ToolsGridItems.SETTINGS));
 
         gridView = inflate.findViewById(R.id.tools_grid);
         toolsGridAdapter = new ToolsGridViewAdapter(this.getContext(), R.layout.row_grid, gridArray);
@@ -61,13 +63,24 @@ public class ToolsFragment extends Fragment {
         gridView.setOnItemClickListener(new OnItemClickListener() {
             public void onItemClick(AdapterView<?> parent, View v,
                                     int position, long id) {
-                Toast.makeText(
-                        getActivity().getApplicationContext(),
-                        ((TextView) v.findViewById(R.id.item_text))
-                                .getText(), Toast.LENGTH_SHORT).show();
 
-                //NavDirections action = ;
-                navController.navigate(ToolsFragmentDirections.actionToolsFragmentToEmployeesFragment());
+                switch (gridArray.get(position).getId()){
+                    case ToolsGridItem.ToolsGridItems.EMPLOYEES:
+                        navController.navigate(ToolsFragmentDirections.actionToolsFragmentToEmployeesFragment());
+                        break;
+                    case ToolsGridItem.ToolsGridItems.DTR:
+                        Logger.w("todo: DTR make this work");
+                        break;
+                    case ToolsGridItem.ToolsGridItems.EQUIPMENT_UPDATE:
+                        Logger.w("todo: EQUIPMENT_UPDATE make this work");
+                        break;
+                    case ToolsGridItem.ToolsGridItems.SETTINGS:
+                        navController.navigate(ToolsFragmentDirections.actionToolsFragmentToSettingsFragment());
+                        break;
+                    default: break;
+                }
+
+
             }
         });
 

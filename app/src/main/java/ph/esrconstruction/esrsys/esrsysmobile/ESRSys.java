@@ -4,9 +4,14 @@ import android.Manifest;
 import android.app.Application;
 import io.realm.Realm;
 
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.SystemClock;
@@ -14,6 +19,7 @@ import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -39,8 +45,15 @@ import com.orhanobut.logger.AndroidLogAdapter;
 import com.orhanobut.logger.FormatStrategy;
 import com.orhanobut.logger.Logger;
 import com.orhanobut.logger.PrettyFormatStrategy;
+import com.suprema.BioMiniFactory;
+import com.suprema.IBioMiniDevice;
+import com.suprema.IUsbEventHandler;
+import com.telpo.tps550.api.fingerprint.FingerPrint;
 
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
 
 public class ESRSys extends Application implements LifecycleOwner {
@@ -55,7 +68,18 @@ public class ESRSys extends Application implements LifecycleOwner {
     /////////////////dev mode
     public static Boolean devMode = false;
 
+    private static BioMiniFactory mBioMiniFactory = null;
+    public static final int REQUEST_WRITE_PERMISSION = 786;
+    public IBioMiniDevice mCurrentDevice = null;
 
+    private IBioMiniDevice.CaptureOption mCaptureOptionDefault = new IBioMiniDevice.CaptureOption();
+
+    //Flag.
+    public static final boolean mbUsbExternalUSBManager = false;
+    private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
+    private UsbManager mUsbManager = null;
+    private PendingIntent mPermissionIntent= null;
+    //
 
     private static RealmConfiguration esrConfig;
 
@@ -198,7 +222,23 @@ public class ESRSys extends Application implements LifecycleOwner {
 
 
 
+
         periodicPingHandler.post(periodicPingUpdate);
+
+
+
+
+        /////////////
+        FingerPrint.fingerPrintPower(1);
+        mCaptureOptionDefault.frameRate = IBioMiniDevice.FrameRate.SHIGH;
+
+        if(mBioMiniFactory != null) {
+            mBioMiniFactory.close();
+        }
+
+
+
+        restartBioMini();
 
         startEmployeeSyncService("first time");
 
@@ -206,8 +246,102 @@ public class ESRSys extends Application implements LifecycleOwner {
     }
 
 
+    void restartBioMini() {
+        if(mBioMiniFactory != null) {
+            mBioMiniFactory.close();
+        }
+        if( mbUsbExternalUSBManager ){
+            mUsbManager = (UsbManager)getSystemService(Context.USB_SERVICE);
+            mBioMiniFactory = new BioMiniFactory(this, mUsbManager){
+                @Override
+                public void onDeviceChange(DeviceChangeEvent event, Object dev) {
+                    Logger.d("----------------------------------------");
+                    Logger.d("onDeviceChange : " + event + " using external usb-manager");
+                    Logger.d("----------------------------------------");
+                    handleDevChange(event, dev);
+                }
+            };
+            //
+            mPermissionIntent = PendingIntent.getBroadcast(this,0,new Intent(ACTION_USB_PERMISSION),0);
+            IntentFilter filter = new IntentFilter(ACTION_USB_PERMISSION);
+            registerReceiver(mUsbReceiver, filter);
+            checkDevice();
+        }else {
+            mBioMiniFactory = new BioMiniFactory(this) {
+                @Override
+                public void onDeviceChange(DeviceChangeEvent event, Object dev) {
+                    Logger.d("----------------------------------------");
+                    Logger.d("onDeviceChange : " + event);
+                    Logger.d("----------------------------------------");
+                    handleDevChange(event, dev);
+                }
+            };
+        }
+        //mBioMiniFactory.setTransferMode(IBioMiniDevice.TransferMode.MODE2);
+    }
+    void handleDevChange(IUsbEventHandler.DeviceChangeEvent event, Object dev) {
+        if (event == IUsbEventHandler.DeviceChangeEvent.DEVICE_ATTACHED && mCurrentDevice == null) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    int cnt = 0;
+                    while (mBioMiniFactory == null && cnt < 20) {
+                        SystemClock.sleep(1000);
+                        cnt++;
+                    }
+                    if (mBioMiniFactory != null) {
+                        mCurrentDevice = mBioMiniFactory.getDevice(0);
+                        Log.d(TAG, "mCurrentDevice attached : " + mCurrentDevice);
+                        if (mCurrentDevice != null) {
+                            Logger.d(" DeviceName : " + mCurrentDevice.getDeviceInfo().deviceName);
+                            Logger.d("         SN : " + mCurrentDevice.getDeviceInfo().deviceSN);
+                            Logger.d("SDK version : " + mCurrentDevice.getDeviceInfo().versionSDK);
 
+                        }
+                    }
+                }
+            }).start();
+        } else if (mCurrentDevice != null && event == IUsbEventHandler.DeviceChangeEvent.DEVICE_DETACHED && mCurrentDevice.isEqual(dev)) {
+            Log.d(TAG, "mCurrentDevice removed : " + mCurrentDevice);
+            mCurrentDevice = null;
+        }
+    }
 
+    private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver(){
+        public void onReceive(Context context, Intent intent){
+            String action = intent.getAction();
+            if(ACTION_USB_PERMISSION.equals(action)){
+                synchronized(this){
+                    UsbDevice device = (UsbDevice)intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
+                    if(intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)){
+                        if(device != null){
+                            if( mBioMiniFactory == null) return;
+                            mBioMiniFactory.addDevice(device);
+                            Logger.d(String.format(Locale.ENGLISH ,"Initialized device count- BioMiniFactory (%d)" , mBioMiniFactory.getDeviceCount() ));
+                        }
+                    }
+                    else{
+                        Log.d(TAG, "permission denied for device"+ device);
+                    }
+                }
+            }
+        }
+    };
+    public void checkDevice(){
+        if(mUsbManager == null) return;
+        Logger.d("checkDevice");
+        HashMap<String , UsbDevice> deviceList = mUsbManager.getDeviceList();
+        Iterator<UsbDevice> deviceIter = deviceList.values().iterator();
+        while(deviceIter.hasNext()){
+            UsbDevice _device = deviceIter.next();
+            if( _device.getVendorId() ==0x16d1 ){
+                //Suprema vendor ID
+                mUsbManager.requestPermission(_device , mPermissionIntent);
+            }else{
+            }
+        }
+
+    }
 
 
     Handler periodicPingHandler = new Handler();

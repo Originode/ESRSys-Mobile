@@ -8,12 +8,18 @@ import androidx.annotation.Nullable;
 
 import org.joda.time.DateTime;
 
+import io.realm.RealmList;
 import io.realm.RealmObject;
 import io.realm.annotations.Required;
 import io.realm.annotations.PrimaryKey;
 import ph.esrconstruction.esrsys.esrsysmobile.ESRSys;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 
 public class Employee extends RealmObject {
     @PrimaryKey
@@ -51,6 +57,11 @@ public class Employee extends RealmObject {
 
     @Nullable
     private Date LastScanned;
+
+    @Required
+    private RealmList<byte[]> FingerprintTemplates = new RealmList<>();
+
+
 
     private int xxxxxxxxxxxxxx;
 
@@ -164,5 +175,17 @@ public class Employee extends RealmObject {
     public void setRemarks(@Nullable String remarks) {
         Remarks = remarks;
     }
+
+
+
+    public RealmList<byte[]> getFingerprintTemplates() {
+        return FingerprintTemplates;
+    }
+
+    public void setFingerprintTemplates(@Nullable RealmList<byte[]> fingerprintTemplates) {
+        FingerprintTemplates = fingerprintTemplates;
+    }
+
+
 }
 

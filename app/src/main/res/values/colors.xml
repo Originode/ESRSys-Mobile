@@ -4,7 +4,12 @@
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
 
-
+    <color name="colorSupremaPrimary">#b23f0a</color>
+    <color name="colorSupremaLogText">#606060</color>
+    <color name="colorSupremaSettingBG">#efefef</color>
+    <color name="colorSupremaLightGray">#efefef</color>
+    <color name="colorSupremaText">#000000</color>
+    <color name="colorSupremaDarkSpace">#cfcfcf</color>
 
     <color name="Black">#FF000000</color>
     <color name="White">#FFFFFFFF</color>

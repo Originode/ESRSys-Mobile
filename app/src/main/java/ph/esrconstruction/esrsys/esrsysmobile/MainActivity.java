@@ -4,16 +4,13 @@ package ph.esrconstruction.esrsys.esrsysmobile;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.hardware.usb.UsbManager;
-import android.nfc.NdefMessage;
+import android.graphics.Bitmap;
 import android.nfc.NfcAdapter;
-import android.nfc.Tag;
-import android.nfc.tech.MifareClassic;
 import android.os.Bundle;
-import android.os.Parcelable;
+import android.os.SystemClock;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.Switch;
 
 
 import com.fatboyindustrial.gsonjodatime.Converters;
@@ -40,33 +37,23 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 import org.joda.time.DateTime;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
-
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.function.Consumer;
-import java.util.function.Function;
-
 import io.realm.Realm;
-import io.realm.RealmResults;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.CardData;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.EmployeeCardData;
 import ph.esrconstruction.esrsys.esrsysmobile.events.MessageEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.events.TimerEvent;
+import ph.esrconstruction.esrsys.esrsysmobile.fp.FingerPrintCaptureEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NFCReadFragment;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NFCWriteFragment;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NfcListener;
-import ph.esrconstruction.esrsys.esrsysmobile.utils.etc;
-import ph.esrconstruction.esrsys.esrsysmobile.utils.nfcUtils;
+import ph.esrconstruction.esrsys.esrsysmobile.utils.Etc;
+import ph.esrconstruction.esrsys.esrsysmobile.utils.NfcUtils;
 
-import com.suprema.BioMiniFactory;
+import com.suprema.CaptureResponder;
 import com.suprema.IBioMiniDevice;
+
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity implements
                                     NavigationView.OnNavigationItemSelectedListener, NfcListener {
@@ -83,15 +70,7 @@ public class MainActivity extends AppCompatActivity implements
     public NFCWriteFragment mNfcWriteFragment;
     public NFCReadFragment mNfcReadFragment;
 
-    //Flag.
-    public static final boolean mbUsbExternalUSBManager = false;
-    private static final String ACTION_USB_PERMISSION = "com.android.example.USB_PERMISSION";
-    private UsbManager mUsbManager = null;
-    private PendingIntent mPermissionIntent= null;
-    //
-    private static BioMiniFactory mBioMiniFactory = null;
-    public static final int REQUEST_WRITE_PERMISSION = 786;
-    public IBioMiniDevice mCurrentDevice = null;
+
 
 
     private boolean isDialogDisplayed = false;
@@ -109,24 +88,26 @@ public class MainActivity extends AppCompatActivity implements
 
         Logger.t(TAG).v("onCreate");
 
-/////////////network observer
-
-            try {
-                //NdefWriterDemo demo = new NdefWriterDemo();
-               // demo.runNdefWriter();
-
-                //NdefWriter www = new NdefWriter();
 
 
-            }
-            catch (Exception e) {
-               // e.printStackTrace();
-            }
+        if( !ESRSys.mbUsbExternalUSBManager ){
+            //Button btn_checkDevice = (Button)findViewById(R.id.buttonCheckDevice);
+            //btn_checkDevice.setClickable(false);
+            //btn_checkDevice.setEnabled(false);
+        }else{
+            //((Button)findViewById(R.id.buttonCheckDevice)).setOnClickListener(new View.OnClickListener() {
+            //    @Override
+            //    public void onClick(View v) {
+            //        checkDevice();
+            //    }
+            // });
+        }
+
+        //printRev(""+mBioMiniFactory.getSDKInfo());
 
 
 
         /////////////
-
 
         mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
 
@@ -196,7 +177,7 @@ public class MainActivity extends AppCompatActivity implements
                 break;
 
             case R.id.second:
-                navController.navigate(R.id.secondFragment);
+                navController.navigate(R.id.reportsFragment);
                 break;
 
 
@@ -295,7 +276,7 @@ public class MainActivity extends AppCompatActivity implements
 
         Logger.t(TAG).d("onNewIntent: "+intent.getAction());
         byte[] tagId = intent.getByteArrayExtra(NfcAdapter.EXTRA_ID);
-        Logger.t(TAG).d(etc.bytesToHexString(tagId));
+        Logger.t(TAG).d(Etc.bytesToHexString(tagId));
 
         // check for NFC related actions
         if (NfcAdapter.ACTION_TAG_DISCOVERED.equals(intent.getAction())) {
@@ -305,7 +286,7 @@ public class MainActivity extends AppCompatActivity implements
         }
 
             //formatMifareClassicToEmployeeCard(intent);
-        nfcUtils.readCard(intent, (checkHash, card_type, info) -> {
+        NfcUtils.readCard(intent, (checkHash, card_type, info) -> {
             Gson g = Converters.registerDateTime(new GsonBuilder()).setLenient().create();
             try {
                 if(checkHash){
@@ -392,6 +373,67 @@ public class MainActivity extends AppCompatActivity implements
         }
     }
 
+
+
+
+
+
+
+
+
+
+
+    private CaptureResponder mCaptureResponsePrev = new CaptureResponder() {
+        @Override
+        public boolean onCaptureEx(final Object context, final Bitmap capturedImage,
+                                   final IBioMiniDevice.TemplateData capturedTemplate,
+                                   final IBioMiniDevice.FingerState fingerState) {
+
+            Logger.d("CaptureResponsePrev", String.format(Locale.ENGLISH , "captureTemplate.size (%d) , fingerState(%s)" , capturedTemplate== null? 0 : capturedTemplate.data.length, String.valueOf(fingerState.isFingerExist)));
+           // printState(getResources().getText(R.string.start_capture_ok));
+            byte[] pImage_raw =null;
+            if( (ESRSys.getInstance().mCurrentDevice!= null && (pImage_raw = ESRSys.getInstance().mCurrentDevice.getCaptureImageAsRAW_8() )!= null)) {
+                Logger.d("CaptureResponsePrev ", String.format(Locale.ENGLISH, "pImage (%d) , FP Quality(%d)", pImage_raw.length , ESRSys.getInstance().mCurrentDevice.getFPQuality(pImage_raw, ESRSys.getInstance().mCurrentDevice.getImageWidth(), ESRSys.getInstance().mCurrentDevice.getImageHeight(), 2)));
+            }
+            EventBus.getDefault().post(new FingerPrintCaptureEvent(context,capturedImage,capturedTemplate,fingerState,FingerPrintCaptureEvent.Modes.CAPTURE));
+            return true;
+        }
+
+        @Override
+        public void onCaptureError(Object context, int errorCode, String error) {
+            Logger.e("onCaptureError : " + error);
+            Logger.e(((IBioMiniDevice)context).popPerformanceLog());
+            if( errorCode != IBioMiniDevice.ErrorCode.OK.value());
+               // printState(getResources().getText(R.string.start_capture_fail));
+        }
+    };
+
+    private CaptureResponder mVerifyResponsePrev = new CaptureResponder() {
+        @Override
+        public boolean onCaptureEx(final Object context, final Bitmap capturedImage,
+                                   final IBioMiniDevice.TemplateData capturedTemplate,
+                                   final IBioMiniDevice.FingerState fingerState) {
+
+            Logger.d("VerifyResponsePrev: " + String.format(Locale.ENGLISH , "captureTemplate.size (%d) , fingerState(%s)" , capturedTemplate== null? 0 : capturedTemplate.data.length, String.valueOf(fingerState.isFingerExist)));
+            // printState(getResources().getText(R.string.start_capture_ok));
+            byte[] pImage_raw =null;
+            if( (ESRSys.getInstance().mCurrentDevice!= null && (pImage_raw = ESRSys.getInstance().mCurrentDevice.getCaptureImageAsRAW_8() )!= null)) {
+                Logger.d("CaptureResponsePrev: " + String.format(Locale.ENGLISH, "pImage (%d) , FP Quality(%d)", pImage_raw.length , ESRSys.getInstance().mCurrentDevice.getFPQuality(pImage_raw, ESRSys.getInstance().mCurrentDevice.getImageWidth(), ESRSys.getInstance().mCurrentDevice.getImageHeight(), 2)));
+            }
+            EventBus.getDefault().post(new FingerPrintCaptureEvent(context,capturedImage,capturedTemplate,fingerState,FingerPrintCaptureEvent.Modes.VERIFY));
+            return true;
+        }
+
+        @Override
+        public void onCaptureError(Object context, int errorCode, String error) {
+            Logger.e("onCaptureError : " + error);
+            Logger.e(((IBioMiniDevice)context).popPerformanceLog());
+            if( errorCode != IBioMiniDevice.ErrorCode.OK.value());
+            // printState(getResources().getText(R.string.start_capture_fail));
+        }
+    };
+
+
     // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void onMessageEvent(MessageEvent m) {
@@ -399,6 +441,47 @@ public class MainActivity extends AppCompatActivity implements
 
         switch(m.message){
             case MessageEvent.Messages.NFCWriteFragment_closed:
+                break;
+            case MessageEvent.Messages.FingerPrintScanner_start:
+                if(ESRSys.getInstance().mCurrentDevice != null) {
+                    IBioMiniDevice.CaptureOption option = new IBioMiniDevice.CaptureOption();
+                    option.extractParam.captureTemplate = true;
+                    option.captureImage = true;
+                    option.captureTimeout = (int)ESRSys.getInstance().mCurrentDevice.getParameter(IBioMiniDevice.ParameterType.TIMEOUT).value;
+                    ESRSys.getInstance().mCurrentDevice.captureSingle(option,
+                            mCaptureResponsePrev,
+                            true);
+                }
+                break;
+            case MessageEvent.Messages.FingerPrintScanner_verify:
+                if(ESRSys.getInstance().mCurrentDevice != null) {
+                    IBioMiniDevice.CaptureOption option = new IBioMiniDevice.CaptureOption();
+                    option.extractParam.captureTemplate = true;
+                    option.captureImage = true;
+                    option.captureTimeout = (int)ESRSys.getInstance().mCurrentDevice.getParameter(IBioMiniDevice.ParameterType.TIMEOUT).value;
+                    ESRSys.getInstance().mCurrentDevice.captureSingle(option,
+                            mVerifyResponsePrev,
+                            true);
+                }
+                break;
+            case MessageEvent.Messages.FingerPrintScanner_abort:
+                if(ESRSys.getInstance().mCurrentDevice != null) {
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            ESRSys.getInstance().mCurrentDevice.abortCapturing();
+                            int nRetryCount =0;
+                            while(ESRSys.getInstance().mCurrentDevice != null && ESRSys.getInstance().mCurrentDevice.isCapturing()){
+                                SystemClock.sleep(10);
+                                nRetryCount++;
+                            }
+                            Log.d("AbortCapturing" , String.format(Locale.ENGLISH ,
+                                    "IsCapturing return false.(Abort-lead time: %dms) " ,
+                                    nRetryCount* 10));
+                        }
+                    }).start();
+                }
+                break;
             default:
 
         }

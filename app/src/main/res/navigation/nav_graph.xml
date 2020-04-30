@@ -13,9 +13,15 @@
         <action
             android:id="@+id/action_toolsFragment_to_employeesFragment"
             app:destination="@id/employeesFragment" />
+        <action
+            android:id="@+id/action_toolsFragment_to_reportFragment"
+            app:destination="@id/reportsFragment" />
+        <action
+            android:id="@+id/action_toolsFragment_to_settingsFragment"
+            app:destination="@id/settingsFragment" />
     </fragment>
     <fragment
-        android:id="@+id/secondFragment"
+        android:id="@+id/reportsFragment"
         android:name="ph.esrconstruction.esrsys.esrsysmobile.ReportsFragment"
         android:label="Reports"
         tools:layout="@layout/reports_fragment" />
@@ -69,5 +75,11 @@
         android:name="ph.esrconstruction.esrsys.esrsysmobile.ui.EmployeeFragment"
         android:label="Employee"
         tools:layout="@layout/fragment_employee" >
+    </fragment>
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="ph.esrconstruction.esrsys.esrsysmobile.ui.SettingsFragment"
+        android:label="Settings"
+        tools:layout="@layout/settings_fragment" >
     </fragment>
 </navigation>
