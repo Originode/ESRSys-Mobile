@@ -108,19 +108,16 @@ public class ESREmployeeRealmSyncService extends Service {
         });
         realme.close();
 
-        Logger.i("Server Connected : " + ESRSys.getServer().getServerConnected().getValue());
-        Logger.i("Logged in : " + ESRSys.getInstance().currentLogin.isLoggedIn());
-        if(ESRSys.getServer().getServerConnected().getValue() && ESRSys.getInstance().currentLogin.isLoggedIn()) {
+        if(!ESRSys.getServer().getServerConnected()) Logger.i(ESRSys.getServer().name +  "is not connected");
+        if(!ESRSys.getInstance().currentLogin.isLoggedIn()) Logger.i("not logged in");
 
-
+        if(ESRSys.getServer().getServerConnected() && ESRSys.getInstance().currentLogin.isLoggedIn()) {
             // Get Images and Data and Delete old data from Realm database....
             //String url_api_get = getBaseURL + "appservices/Employee/grid1?_pageIndex=2&_pageSize=10&_sortExpression=LastName";
             String url_api_get = ESRSys.getBaseURL() + "appservices/Employee/grid1?_pageSize=5000&_sortExpression=LastName";
             Logger.i("network online: " + url_api_get);
             JsonObjectRequest stringRequest = new JsonObjectRequest(Request.Method.GET, url_api_get, null,
                     response -> {
-                        Logger.d("response");
-                        //Logger.i(response.toString());
                         JSONArray jsonArray = null;
                         try {
                             jsonArray = response.getJSONArray("Employee");
@@ -308,10 +305,7 @@ public class ESREmployeeRealmSyncService extends Service {
                    // String encodedString = Base64.encodeToString(String.format("%s:%s", "mnrevelo", "mX111401!!").getBytes(), Base64.NO_WRAP);
                     //String value = String.format("Basic %s", encodedString);
 
-
-                    Logger.i("Server Connected : " + ESRSys.getServer().getServerConnected().getValue());
-                    Logger.i("Logged in : " + ESRSys.getInstance().currentLogin.isLoggedIn());
-
+                    //
 
                     headers.put("Accept", "application/json");
                   //  headers.put(key, ESRSys.getInstance().currentLogin.getRuser().getEncodedCredentials());
@@ -350,7 +344,10 @@ public class ESREmployeeRealmSyncService extends Service {
             EventBus.getDefault().post(new TimerEvent(TimerEvent.Messages.EmployeeSync,System.nanoTime(),periodicEmployeeUpdateDelay));
             // whatever you want to do below
 
-           employeeUpdate();
+            if(ESRSys.getInstance().deviceSettings.getAutoSync()){
+                employeeUpdate();
+            }
+
         }
     };
 
@@ -368,61 +365,65 @@ public class ESREmployeeRealmSyncService extends Service {
         @Override
         public void run() {
             periodicTestHandler.postDelayed(periodicTestUpdate, 3*1000 - SystemClock.elapsedRealtime()%1000);
-            if(ESRSys.getServer().getServerConnected().getValue()) {
+            if(ESRSys.getInstance().deviceSettings.getAutoSync()){
+                if(ESRSys.getServer().getServerConnected()) {
 
-                final int threads = 150;
+                    final int threads = 150;
 
-                //laze load some images
-                if(imageLoaderCount < threads){
-
-
-
-                    Realm realm = Realm.getInstance(ESRSys.getEsrConfig());
-                    realm.executeTransactionAsync(inRealm -> {
-
-                        long ddd = inRealm.where(Employee.class).count();
-                        long ccc = inRealm.where(Employee.class)
-                                .equalTo("ImageLoaded", 0) //
-                                .and()
-                                .isNotEmpty("ImageURL")
-                                .and()
-                                .isNotNull("ImageURL").count();
-
-                        long eee = inRealm.where(Employee.class)
-                                .equalTo("ImageLoaded", -1).count();
+                    //laze load some images
+                    if(imageLoaderCount < threads){
 
 
 
-                        if(ccc > 0){
-                            long limits = max(threads-eee,1);
-                            Logger.d("lazy loading " + eee + "/" + ccc + " of " + ddd  + " employee images");
-                            final RealmResults<Employee> employees = inRealm.where(Employee.class)
+                        Realm realm = Realm.getInstance(ESRSys.getEsrConfig());
+                        realm.executeTransactionAsync(inRealm -> {
+                            // long eee = inRealm.where(Employee.class).hashCode();
+                            long ddd = inRealm.where(Employee.class).count();
+                            long ccc = inRealm.where(Employee.class)
                                     .equalTo("ImageLoaded", 0) //
                                     .and()
                                     .isNotEmpty("ImageURL")
                                     .and()
-                                    .isNotNull("ImageURL")
-                                    .limit(limits)
-                                    .findAll();
-                            final OrderedRealmCollection<Employee> posts = employees.createSnapshot(); // <-- snapshot
-                            employees.setValue("ImageLoaded", -1);
-                            lazyloadImages(posts);
-                        }
+                                    .isNotNull("ImageURL").count();
 
-                    }, () -> {
-
-                        realm.close();
-                    }, error -> {
-                        realm.close();
-                    });
+                            long eee = inRealm.where(Employee.class)
+                                    .equalTo("ImageLoaded", -1).count();
 
 
 
+                            if(ccc > 0){
+                                long limits = max(threads-eee,1);
+                                Logger.d("lazy loading " + eee + "/" + ccc + " of " + ddd  + " employee images");
+                                final RealmResults<Employee> employees = inRealm.where(Employee.class)
+                                        .equalTo("ImageLoaded", 0) //
+                                        .and()
+                                        .isNotEmpty("ImageURL")
+                                        .and()
+                                        .isNotNull("ImageURL")
+                                        .limit(limits)
+                                        .findAll();
+                                final OrderedRealmCollection<Employee> posts = employees.createSnapshot(); // <-- snapshot
+                                employees.setValue("ImageLoaded", -1);
+                                lazyloadImages(posts);
+                            }
 
+                        }, () -> {
+
+                            realm.close();
+                        }, error -> {
+                            realm.close();
+                        });
+
+
+
+
+                    }
+                }else{
+                    //Logger.i("waiting for network");
                 }
-            }else{
-                //Logger.i("waiting for network");
             }
+
+
         }
     };
 

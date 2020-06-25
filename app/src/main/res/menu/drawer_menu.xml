@@ -24,9 +24,9 @@
             android:icon="@drawable/ic_save_black_24dp"
             android:title="Login" />
         <item
-            android:id="@+id/app_bar_switch"
-            android:title="AutoSync"
-            app:actionLayout="@layout/switch_item"
+            android:id="@+id/menu_toggle_auto_sync"
+            android:title="Sync"
+            app:actionLayout="@layout/menu_toggle_auto_sync_switch"
             app:showAsAction="always" />
     </group>
 

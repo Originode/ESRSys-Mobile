@@ -4,12 +4,16 @@ import android.os.AsyncTask;
 
 import com.orhanobut.logger.Logger;
 
+import org.greenrobot.eventbus.EventBus;
+
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.util.Objects;
 
 import ph.esrconstruction.esrsys.esrsysmobile.ESRSys;
+import ph.esrconstruction.esrsys.esrsysmobile.events.ServerMessageEvent;
 
 class Ping extends AsyncTask<Void,Void,Boolean> {
 
@@ -37,5 +41,9 @@ class Ping extends AsyncTask<Void,Void,Boolean> {
     } catch (IOException e) { return false; } }
 
     @Override protected void onPostExecute(Boolean internet) {
-        mServer.setServerConnected(internet); }
+        if(Objects.requireNonNull(mServer.getServerConnected()) != internet){
+            mServer.setServerConnected(internet);
+            EventBus.getDefault().post(new ServerMessageEvent(mServer, internet ? ServerMessageEvent.Messages.ServerOnline : ServerMessageEvent.Messages.ServerOffline, internet));
+        }
+    }
 }

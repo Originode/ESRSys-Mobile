@@ -34,6 +34,7 @@ import io.realm.RealmResults;
 
 
 import ph.esrconstruction.esrsys.esrsysmobile.cards.EmployeeCardData;
+import ph.esrconstruction.esrsys.esrsysmobile.events.ServerMessageEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.HomeViewModel;
 
@@ -193,15 +194,6 @@ public class HomeFragment extends Fragment {
         });
         updateCounts();
 
-        ESRSys.devServer.getServerConnected().observe(this, serverConnected -> {
-            updateUI();
-        });
-        ESRSys.localServer.getServerConnected().observe(this, serverConnected -> {
-            updateUI();
-        });
-        ESRSys.remoteServer.getServerConnected().observe(this, serverConnected -> {
-            updateUI();
-        });
     }
 
     @Override
@@ -222,6 +214,12 @@ public class HomeFragment extends Fragment {
 
         HomeFragmentDirections.ActionHomeFragmentToEmployeeFragment action =  HomeFragmentDirections.actionHomeFragmentToEmployeeFragment(cd.EmployeeID);
         navController.navigate(action);
+    }
+
+    // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onServerMessageEvent(ServerMessageEvent sm) {
+        updateUI();
     }
 
 }

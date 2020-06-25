@@ -19,6 +19,7 @@ import java.net.Socket;
 import java.net.URL;
 
 public class ESRServer {
+    public int id = 0;
     public String name = "ESR";
     public String ip = "10.0.0.162";
     public String port = "53053";
@@ -35,16 +36,14 @@ public class ESRServer {
 
 
 
-    public ESRServer(String Name, String Protocol, String Ip, String Port,Context context){
+    public ESRServer(int Id, String Name, String Protocol, String Ip, String Port,Context context){
+        this.id = Id;
         this.name = Name;
         this.ip = Ip;
         this.port = Port;
         this.protocol = Protocol;
         this.context = context;
-        if (this.serverConnected == null) {
-            this.serverConnected = new MutableLiveData<>();
-            this.serverConnected.setValue(false);
-        }
+        this.serverConnected = false;
         try {
             this.url = new URL(this.getURL());
         } catch (MalformedURLException e) {
@@ -63,18 +62,14 @@ public class ESRServer {
 
 
 
-    private MutableLiveData<Boolean> serverConnected;
+    private Boolean serverConnected = false;
 
-    @Nullable
-    public LiveData<Boolean> getServerConnected() {
-        if (serverConnected == null) {
-            serverConnected = new MutableLiveData<>();
-            serverConnected.setValue(false);
-        }
+
+    public Boolean getServerConnected() {
         return serverConnected;
     }
     public void setServerConnected(Boolean x){
-        serverConnected.setValue(x);
+        serverConnected = x;
     }
 
 

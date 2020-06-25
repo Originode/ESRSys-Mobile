@@ -34,6 +34,8 @@ class LoginRepository(val dataSource: LoginDataSource) {
         //get stored device settings
         var deviceSettings:DeviceSettings
         val rr = arrayOf("")
+
+        /*
         realm = Realm.getInstance(ESRSys.getEsrConfig())
         realm.executeTransaction { inRealm ->
             if (inRealm.where(DeviceSettings::class.java).count() > 0) {
@@ -41,7 +43,7 @@ class LoginRepository(val dataSource: LoginDataSource) {
                 deviceSettings = inRealm.where(DeviceSettings::class.java).findFirst()!!
             } else {
                 Logger.i("creating new device settings...")
-                deviceSettings = inRealm.createObject(DeviceSettings::class.java, "Unknwon-000")
+                deviceSettings = inRealm.createObject(DeviceSettings::class.java, 1)
             }
             rr[0] = deviceSettings.cachedUser
             Logger.i(rr[0])
@@ -56,9 +58,9 @@ class LoginRepository(val dataSource: LoginDataSource) {
 
                     var username = (user?.userId ?: "")
                     var token = (user?.token ?: "")
-                    Logger.d("xxxx" + ESRSys.getServer().serverConnected!!.value!!)
+                    Logger.d("xxxx" + ESRSys.getServer().serverConnected)
 
-                    if (username != "" && token != "" && ESRSys.getServer().serverConnected!!.value!!) {
+                    if (username != "" && token != "" && ESRSys.getServer().serverConnected) {
                         Logger.d("server online... executing auto login...")
 
                         //todo: zzzzzzz
@@ -70,6 +72,37 @@ class LoginRepository(val dataSource: LoginDataSource) {
         }
         // realm.close()
 
+         */
+
+        realm = Realm.getInstance(ESRSys.getEsrConfig())
+        realm.executeTransaction { inRealm ->
+
+            rr[0] = ESRSys.getInstance().deviceSettings.cachedUser;
+            Logger.i(rr[0])
+            if(rr[0] != ""){
+
+                var r = inRealm.where<LoggedInUser>(LoggedInUser::class.java).equalTo("userId", rr[0])
+                Logger.i(r.count().toString())
+                if(r.count()>0){
+                    user = r.findFirst()
+                    Logger.d("cached user: " + (user?.userId ?: ""))
+                    Logger.d("cached token: " + (user?.token ?: ""))
+
+                    var username = (user?.userId ?: "")
+                    var token = (user?.token ?: "")
+                    Logger.d("xxxx" + ESRSys.getServer().serverConnected)
+
+                    if (username != "" && token != "" && ESRSys.getServer().serverConnected) {
+                        Logger.d("server online... executing auto login...")
+
+                        //todo: zzzzzzz
+                    }
+
+                }
+
+            }
+        }
+        // realm.close()
 
     }
 
@@ -82,14 +115,7 @@ class LoginRepository(val dataSource: LoginDataSource) {
         val rr = arrayOf("")
         val realm = Realm.getInstance(ESRSys.getEsrConfig())
         realm.executeTransaction { inRealm ->
-            if (inRealm.where(DeviceSettings::class.java).count() > 0) {
-                Logger.i("loading device settings")
-                deviceSettings = inRealm.where(DeviceSettings::class.java).findFirst()!!
-            } else {
-                Logger.i("creating new device settings...")
-                deviceSettings = inRealm.createObject(DeviceSettings::class.java, "Unknwon-000")
-            }
-            rr[0] = deviceSettings.cachedUser
+            rr[0] = ESRSys.getInstance().deviceSettings.cachedUser;
             Logger.i(rr[0])
             if(rr[0] != ""){
 
@@ -102,9 +128,9 @@ class LoginRepository(val dataSource: LoginDataSource) {
 
                     var username = (user?.userId ?: "")
                     var token = (user?.token ?: "")
-                    Logger.d("xxxx" + ESRSys.getServer().serverConnected!!.value!!)
+                    Logger.d("xxxx" + ESRSys.getServer().serverConnected)
 
-                    if (username != "" && token != "" && ESRSys.getServer().serverConnected!!.value!!) {
+                    if (username != "" && token != "" && ESRSys.getServer().serverConnected) {
                         Logger.d("server online... executing auto login...")
 
                         ////////////////*
@@ -118,6 +144,9 @@ class LoginRepository(val dataSource: LoginDataSource) {
                                 Logger.d("autologin success: " + it.data.displayName)
                                 //save cached username
 
+                                ESRSys.getInstance().setDevSettingsCachedUser(it.data.userId);
+
+                                /*
                                 val realm = Realm.getInstance(ESRSys.getEsrConfig())
                                 realm.executeTransaction { inRealm ->
                                     var deviceSettings = DeviceSettings()
@@ -127,6 +156,8 @@ class LoginRepository(val dataSource: LoginDataSource) {
                                     deviceSettings.cachedUser = it.data.userId
                                 }
                                 realm.close()
+                                */
+
                             }else{
                                 Logger.d(it.toString())
                             }
@@ -151,6 +182,9 @@ class LoginRepository(val dataSource: LoginDataSource) {
             if(it) {
                 //remove cached user
                 try {
+                    ESRSys.getInstance().setDevSettingsCachedUser("");
+
+                    /*
                     realm.executeTransaction { inRealm ->
                         user?.deleteFromRealm()
 
@@ -161,9 +195,11 @@ class LoginRepository(val dataSource: LoginDataSource) {
                             }
                             deviceSettings.cachedUser = ""
                     }
+                    *
+                     */
                 }catch (e: Throwable) {
                 }finally {
-                    realm.close()
+                    //realm.close()
                 }
                 //user = null
             }
@@ -183,6 +219,9 @@ class LoginRepository(val dataSource: LoginDataSource) {
 
                 setLoggedInUser(it.data)
 
+                ESRSys.getInstance().setDevSettingsCachedUser(it.data.userId);
+
+                /*
                 //save cached username
                 realm.executeTransaction { inRealm ->
                     var deviceSettings = DeviceSettings()
@@ -191,6 +230,8 @@ class LoginRepository(val dataSource: LoginDataSource) {
                     }
                     deviceSettings.cachedUser = it.data.userId
                 }
+
+                 */
             }
             myCallback.invoke(it)
         })

@@ -11,6 +11,8 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 
 
 import com.fatboyindustrial.gsonjodatime.Converters;
@@ -41,8 +43,10 @@ import io.realm.Realm;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.CardData;
 import ph.esrconstruction.esrsys.esrsysmobile.cards.EmployeeCardData;
 import ph.esrconstruction.esrsys.esrsysmobile.events.MessageEvent;
+import ph.esrconstruction.esrsys.esrsysmobile.events.ServerMessageEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.events.TimerEvent;
 import ph.esrconstruction.esrsys.esrsysmobile.fp.FingerPrintCaptureEvent;
+import ph.esrconstruction.esrsys.esrsysmobile.network.ESRServer;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NFCReadFragment;
 import ph.esrconstruction.esrsys.esrsysmobile.ui.NFCWriteFragment;
@@ -140,6 +144,18 @@ public class MainActivity extends AppCompatActivity implements
         //nav_Menu.findItem(R.id.menu_login_logout).setVisible(!ESRSys.getInstance().currentLogin.isLoggedIn());
         nav_Menu.findItem(R.id.menu_login_logout).setTitle(ESRSys.getInstance().currentLogin.isLoggedIn() ? "Logout" : "Login");
 
+
+        MenuItem menuItemx = nav_Menu.findItem(R.id.menu_toggle_auto_sync); // This is the menu item that contains your switch
+        Switch drawer_switch = (Switch) menuItemx.getActionView().findViewById(R.id.menu_toggle_auto_sync_switch);
+        drawer_switch.setChecked(ESRSys.getInstance().deviceSettings.getAutoSync());
+        drawer_switch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                ESRSys.getInstance().setDevSettingsAutoSync(isChecked);
+                Logger.t(TAG).i("autosync = " + isChecked);
+            }
+        });
+
     }
 
 
@@ -184,6 +200,13 @@ public class MainActivity extends AppCompatActivity implements
 
             case R.id.menu_sync:
                // ESREmployeeRealmSyncService esrEmployeeRealmSyncService = new ESREmployeeRealmSyncService();
+
+
+                MenuItem menuItemx = navigationView.getMenu().findItem(R.id.menu_toggle_auto_sync); // This is the menu item that contains your switch
+                Switch drawer_switch = (Switch) menuItemx.getActionView().findViewById(R.id.menu_toggle_auto_sync_switch);
+                drawer_switch.setChecked(true);
+                ESRSys.getInstance().setDevSettingsAutoSync(true);
+
                 navController.navigate(R.id.employeesFragment);
 
                 ESRSys.getInstance().startEmployeeSyncService("quicky");
@@ -203,6 +226,12 @@ public class MainActivity extends AppCompatActivity implements
 
 
                 break;
+
+            case R.id.menu_toggle_auto_sync:
+                ESRSys.getInstance().setDevSettingsAutoSync(menuItem.isChecked());
+                Logger.t(TAG).i("autosync = " + menuItem.isChecked());
+                break;
+
 
         }
         return true;
@@ -267,8 +296,8 @@ public class MainActivity extends AppCompatActivity implements
     }
     @Override
     public void onStop() {
-        EventBus.getDefault().unregister(this);
         super.onStop();
+        EventBus.getDefault().unregister(this);
     }
 
     @Override
@@ -358,7 +387,7 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void showReadFragment() {
-      //  ((MainActivity)getActivity()).mNfcReadFragment = (NFCReadFragment) getFragmentManager().findFragmentByTag(NFCReadFragment.TAG);
+      //  ((MainActivity)getActivity()).mNfcReadFragment = (NFCReadFragment) getFra gmentManager().findFragmentByTag(NFCReadFragment.TAG);
         if (mNfcReadFragment != null) {
             mNfcReadFragment.dismiss();
         }
@@ -501,6 +530,22 @@ public class MainActivity extends AppCompatActivity implements
 
         }
 
+
+    }
+
+    // This method will be called when a MessageEvent is posted (in the UI thread for Toast)
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onServerMessageEvent(ServerMessageEvent sm) {
+        switch(sm.message){
+            case ServerMessageEvent.Messages.ServerOffline:
+                Logger.t(TAG + "-onServerMessageEvent").d(sm.mServer.name + " is now offline");
+                break;
+            case ServerMessageEvent.Messages.ServerOnline:
+                Logger.t(TAG + "-onServerMessageEvent").d(sm.mServer.name + " is now online");
+                break;
+            default:
+        }
+        Logger.t(TAG + "-onServerMessageEvent").d( "using server: " + ESRSys.getServer().name + " @ " + ESRSys.getServer().getURL());
 
     }
 }

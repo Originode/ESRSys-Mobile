@@ -33,6 +33,7 @@ import ph.esrconstruction.esrsys.esrsysmobile.data.LoginRepository;
 import ph.esrconstruction.esrsys.esrsysmobile.data.model.DeviceSettings;
 import ph.esrconstruction.esrsys.esrsysmobile.network.ConnectionLiveData;
 import ph.esrconstruction.esrsys.esrsysmobile.network.ESRServer;
+import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.model.Employee;
 import ph.esrconstruction.esrsys.esrsysmobile.realmmodules.modules.ESRModules;
 import ph.esrconstruction.esrsys.esrsysmobile.services.ESREmployeeRealmSyncService;
 
@@ -50,6 +51,9 @@ import com.suprema.IBioMiniDevice;
 import com.suprema.IUsbEventHandler;
 import com.telpo.tps550.api.fingerprint.FingerPrint;
 
+import org.greenrobot.eventbus.EventBus;
+import org.joda.time.DateTime;
+
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -58,15 +62,15 @@ import java.util.Locale;
 
 public class ESRSys extends Application implements LifecycleOwner {
 
-    public static ESRServer devServer = new ESRServer( "ESR Dev", "http","10.0.0.16","65012",getInstance());
-    public static ESRServer localServer = new ESRServer("ESR Local","http","10.0.0.13","82",getInstance());
-    public static ESRServer remoteServer = new ESRServer("ESR Remote","http","119.93.149.10","82",getInstance());
-    public static ESRServer offlineServer = new ESRServer("Offline","http","localhost","80",getInstance());
+    public static ESRServer devServer = new ESRServer( 1,"ESR Dev", "http","10.0.0.16","51114",getInstance());
+    public static ESRServer localServer = new ESRServer(2,"ESR Local","http","10.0.0.13","82",getInstance());
+    public static ESRServer remoteServer = new ESRServer(3,"ESR Remote","http","119.93.149.10","82",getInstance());
+    public static ESRServer offlineServer = new ESRServer(4,"Offline","http","localhost","80",getInstance());
 
     public LoginRepository currentLogin;
 
     /////////////////dev mode
-    public static Boolean devMode = false;
+    public static Boolean devMode = true;
 
     private static BioMiniFactory mBioMiniFactory = null;
     public static final int REQUEST_WRITE_PERMISSION = 786;
@@ -91,8 +95,8 @@ public class ESRSys extends Application implements LifecycleOwner {
 
     public static ESRServer getServer() {
 
-        //Logger.d("isDevOnline:" + devServer.getServerConnected().getValue().toString() + "," + devMode.toString());
-        return (devServer.getServerConnected().getValue() && devMode) ? devServer : (localServer.getServerConnected().getValue() ? localServer : (remoteServer.getServerConnected().getValue() ? remoteServer : offlineServer));
+       // Logger.d("isDevOnline:" + devServer.getServerConnected().getValue().toString() + "," + devMode.toString());
+        return (devServer.getServerConnected() && devMode) ? devServer : (localServer.getServerConnected() ? localServer : (remoteServer.getServerConnected() ? remoteServer : offlineServer));
     }
 
     /**
@@ -115,8 +119,8 @@ public class ESRSys extends Application implements LifecycleOwner {
     public static final int MobileData = 2;
     public static final int WifiData = 1;
 
-    private static DeviceSettings deviceSettings;
-
+    public DeviceSettings deviceSettings;
+    private Realm DeviceSettingsRealm;
 
     private LifecycleRegistry lifecycleRegistry = new LifecycleRegistry(this);
     public ConnectionLiveData connectionLiveData;
@@ -176,6 +180,7 @@ public class ESRSys extends Application implements LifecycleOwner {
         }
     }
 
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -191,6 +196,13 @@ public class ESRSys extends Application implements LifecycleOwner {
         // initialize the singleton
         sInstance = this;
 
+
+
+
+        //device settings
+        initDevSettings();
+        ///////////////
+        setDevSettingsSimNumber(getPhone());
         Logger.t(TAG).i("phone number = " + getPhone());
 
 
@@ -198,7 +210,7 @@ public class ESRSys extends Application implements LifecycleOwner {
 
 
 
-        /* Live data object and setting an oberser on it */
+       /*
         connectionLiveData = new ConnectionLiveData(getApplicationContext());
         connectionLiveData.observeForever(connection -> {
             //Logger.t(TAG).d("Network statex");
@@ -219,7 +231,7 @@ public class ESRSys extends Application implements LifecycleOwner {
             Logger.d("server " + (serverConnected ? "online" : "offline"));
 
         });
-
+*/
 
 
 
@@ -307,6 +319,43 @@ public class ESRSys extends Application implements LifecycleOwner {
         }
     }
 
+    public void initDevSettings(){
+        //device settings
+        DeviceSettingsRealm = Realm.getInstance(getEsrConfig());
+        DeviceSettingsRealm.executeTransaction(inRealm -> {
+            if (inRealm.where(DeviceSettings.class).count() > 0) {
+                Logger.i("loading device settings");
+                deviceSettings = inRealm.where(DeviceSettings.class).findFirst();
+            } else {
+                Logger.i("creating new device settings...");
+                deviceSettings = inRealm.createObject(DeviceSettings.class, 1);
+            }
+        });
+    }
+    public void setDevSettingsCachedUser(String user){
+        //device settings
+        DeviceSettingsRealm = Realm.getInstance(getEsrConfig());
+        if(deviceSettings == null) initDevSettings();
+        DeviceSettingsRealm.executeTransaction(inRealm -> {
+                deviceSettings.setCachedUser(user);
+        });
+    }
+    public void setDevSettingsSimNumber(String sim){
+        //device settings
+        DeviceSettingsRealm = Realm.getInstance(getEsrConfig());
+        if(deviceSettings == null) initDevSettings();
+        DeviceSettingsRealm.executeTransaction(inRealm -> {
+            deviceSettings.setSimNumber(sim);
+        });
+    }
+    public void setDevSettingsAutoSync(Boolean async){
+        //device settings
+        DeviceSettingsRealm = Realm.getInstance(getEsrConfig());
+        if(deviceSettings == null) initDevSettings();
+        DeviceSettingsRealm.executeTransaction(inRealm -> {
+            deviceSettings.setAutoSync(async);
+        });
+    }
     private final BroadcastReceiver mUsbReceiver = new BroadcastReceiver(){
         public void onReceive(Context context, Intent intent){
             String action = intent.getAction();

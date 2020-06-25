@@ -33,7 +33,7 @@ class LoginDataSource {
     fun asyncLogin(username: String, password: String, myCallback: (result: Result<LoggedInUser>) -> Unit) {
         // perform some network work
         // on network finished
-        if (ESRSys.getServer().serverConnected?.value!!) {
+        if (ESRSys.getServer().serverConnected) {
             val url_api_get = ESRSys.getBaseURL() + "_invoke/login"
 
             val encodedCredentials = String.format("Basic %s", Base64.encodeToString(String.format("%s:%s", username, password).toByteArray(), Base64.NO_WRAP))
@@ -157,7 +157,7 @@ class LoginDataSource {
     fun asyncLogout(myCallback: (result: Boolean) -> Boolean) {
         // perform some network work
         // on network finished
-        if (ESRSys.getServer().serverConnected?.value!! && ESRSys.getInstance().currentLogin.isLoggedIn) {
+        if (ESRSys.getServer().serverConnected && ESRSys.getInstance().currentLogin.isLoggedIn) {
             val url_api_get = ESRSys.getBaseURL() + "_invoke/login"
             var user = ESRSys.getInstance().currentLogin.user
 
