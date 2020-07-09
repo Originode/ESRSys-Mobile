@@ -95,7 +95,7 @@ class LoginRepository(val dataSource: LoginDataSource) {
                     if (username != "" && token != "" && ESRSys.getServer().serverConnected) {
                         Logger.d("server online... executing auto login...")
 
-                        //todo: zzzzzzz
+                       //not needed? dunno
                     }
 
                 }
